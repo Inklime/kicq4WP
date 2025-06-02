@@ -1,0 +1,76 @@
+﻿<Page
+    x:Class="kicq4WP.ChatPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="#FF121212">
+    <!-- Темный фон -->
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок - темно-синий цвет -->
+        <Grid Grid.Row="0" Background="#045e01">
+            <TextBlock x:Name="ContactNameTextBlock"
+                       Text="Имя контакта"
+                       FontSize="28"
+                       Margin="24,12"
+                       Foreground="White"
+                       VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Область сообщений -->
+        <ListView x:Name="MessagesList"
+                 Grid.Row="1"
+                 Margin="12"
+                 Background="#FF1E1E1E"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}"
+                               TextWrapping="Wrap"
+                               Margin="0,4"
+                               FontSize="18"
+                               Foreground="White"/>
+                    <!-- Белый текст сообщений -->
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Панель ввода - темно-серый фон -->
+        <Grid Grid.Row="2" 
+              Background="#FF2D2D2D">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox x:Name="MessageTextBox"
+                     Grid.Column="0"
+                     Margin="12"
+                     VerticalAlignment="Center"
+                     PlaceholderText="Введите сообщение..."
+                     Background="#FF333333"
+                     Foreground="White"
+                     KeyDown="MessageTextBox_KeyDown"/>
+
+            <!-- Кнопка - темно-синий цвет -->
+            <Button Content="Отправить"
+                    Grid.Column="1"
+                    Click="SendMessage_Click"
+                    Margin="12"
+                    MinWidth="100"
+                    Height="48"
+                    Background="#045e01"
+                    Foreground="White"
+                    BorderBrush="#FF3A5FCD"/>
+            <!-- Светло-синяя граница -->
+        </Grid>
+    </Grid>
+</Page>
