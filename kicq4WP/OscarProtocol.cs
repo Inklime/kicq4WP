@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -190,7 +190,7 @@ namespace kicq4WP
                 {
                     Debug.WriteLine("[DirectAuth] Login succeeded!");
                     await InitializeOscarSessionAsync(statusCode);
-                    await SetStatusAsync(statusCode); // ← передай нужный код
+                    await SetStatusAsync(statusCode);
                     return true;
                 }
                 else
@@ -363,48 +363,44 @@ namespace kicq4WP
         }
 
 
-        public async Task SendClientReadyAsync()
+        private async Task SendClientReadyAsync()
         {
-            byte[] data;
-
             using (var ms = new MemoryStream())
             using (var writer = new BinaryWriter(ms))
             {
-                // Capabilities version
-                writer.Write(SwapUInt32(0x00000001));
-
-                // Timestamp
-                writer.Write(SwapUInt32(0x00000001));
-
-                // Пары Family + Version (каждая по 2 байта)
-                ushort[] familyVersions = new ushort[]
+                // 11 пар (Family ID + Version)
+                ushort[,] families = new ushort[,]
                 {
-            0x0001, 0x0003, // Generic service
-            0x0002, 0x0001, // Location
-            0x0003, 0x0001, // Buddy list
-            0x0004, 0x0001, // Messaging
-            0x0006, 0x0001, // Chat
-            0x0009, 0x0001, // BOS
-            0x000A, 0x0001, // User Lookup
-            0x000B, 0x0001, // Stats
-            0x000C, 0x0001, // Translate
-            0x0013, 0x0001, // SSI (Server Stored Info)
-            0x0015, 0x0001  // ICQ extensions
+            {0x0001, 0x0003}, // Generic
+            {0x0002, 0x0001}, // Location
+            {0x0003, 0x0001}, // Buddy List
+            {0x0004, 0x0001}, // Messaging
+            {0x0006, 0x0001}, // Chat
+            {0x0008, 0x0001}, // BOS
+            {0x0009, 0x0001}, // User Lookup
+            {0x000A, 0x0001}, // Stats
+            {0x000B, 0x0001}, // Translation
+            {0x0013, 0x0001}, // SSI
+            {0x0015, 0x0001}, // ICQ Extensions
                 };
 
-                for (int i = 0; i < familyVersions.Length; i += 2)
+                for (int i = 0; i < families.GetLength(0); i++)
                 {
-                    writer.Write(SwapUInt16(familyVersions[i]));     // Family ID
-                    writer.Write(SwapUInt16(familyVersions[i + 1])); // Version
+                    writer.Write(SwapUInt16(families[i, 0]));
+                    writer.Write(SwapUInt16(families[i, 1]));
                 }
 
-                data = ms.ToArray();
+                byte[] data = ms.ToArray();
+
+                Debug.WriteLine($"[ClientReady] Payload bytes: {BitConverter.ToString(data)}");
+                Debug.WriteLine($"[ClientReady] Total length: {data.Length} bytes");
+
+                await SendSnacAsync(0x01, 0x02, 0x0000, 0x0001, data);
+                Debug.WriteLine($"[ClientReady] Sent SNAC 0x01/0x02 (length={data.Length})");
             }
-
-            await SendSnacAsync(0x0001, 0x0003, 0x0000, 0x0000, data);
-
-            Debug.WriteLine($"[ClientReady] Sent SNAC 0x01/0x03 (length={data.Length})");
         }
+
+
 
 
 
@@ -549,11 +545,8 @@ namespace kicq4WP
             await SendClientReadyAsync();
             Debug.WriteLine("[Init] Sent ClientReady");
 
-            // 2. Capabilities (TLV 0x0006 + 0x000C)
-            await SendCapabilitiesAsync();
-            Debug.WriteLine("[Init] Sent Capabilities");
 
-            // 3. Wait for Server Supported Families: SNAC 0x01/0x03
+            // 2. Wait for Server Supported Families: SNAC 0x01/0x03
             for (int i = 0; i < 10; i++)
             {
                 var flap = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(2));
@@ -571,6 +564,10 @@ namespace kicq4WP
                     break;
                 }
             }
+
+            // 3. Capabilities (TLV 0x0006 + 0x000C)
+            await SendCapabilitiesAsync();
+            Debug.WriteLine("[Init] Sent Capabilities");
 
             // 4. Now that server accepted, continue init
 
