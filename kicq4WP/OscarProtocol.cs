@@ -72,7 +72,7 @@ namespace kicq4WP
             }
         }
 
-        public async Task<bool> AuthenticateAsync(string nickname, uint statusCode)
+        public async Task<bool> AuthenticateAsync(uint statusCode)
         {
             Debug.WriteLine("[Auth] Starting authentication...");
 
@@ -104,7 +104,7 @@ namespace kicq4WP
                     response.Data[3] == 0x01)
                 {
                     Debug.WriteLine("[Auth] Using DirectAuth method");
-                    return await DirectAuth(nickname, statusCode);
+                    return await DirectAuth(statusCode);
                 }
 
                 if (response.Data.Length > 0)
@@ -128,74 +128,74 @@ namespace kicq4WP
             }
         }
 
-        private async Task<bool> DirectAuth(string nickname, uint statusCode)
+        private async Task<bool> DirectAuth(uint statusCode)
         {
             try
             {
                 Debug.WriteLine("[DirectAuth] Building login TLVs...");
                 List<byte> payload = new List<byte>();
 
-                // SNAC header-заглушка
-                payload.AddRange(new byte[] { 0x00, 0x17, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01 });
+                // FLAP protocol version
+                payload.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x01 });
 
-                // TLV 0x01 — UIN (в UTF8)
+                // TLV 0x01 — UIN
                 string cleanUin = _uin.TrimEnd('\0');
-                byte[] uinUtf8 = Encoding.UTF8.GetBytes(cleanUin);
-                payload.AddRange(BuildTlv(0x01, uinUtf8));
-                Debug.WriteLine("[Check] UIN bytes: " + BitConverter.ToString(uinUtf8));
+                byte[] uinBytes = Encoding.UTF8.GetBytes(cleanUin);
+                payload.AddRange(BuildTlv(0x01, uinBytes));
+                Debug.WriteLine("[DirectAuth] UIN: " + cleanUin);
 
-                // TLV 0x4C — MD5(9 нулей + UIN в псевдо-ASCII)
-                byte[] uinAscii = new byte[cleanUin.Length];
-                for (int i = 0; i < cleanUin.Length; i++)
-                    uinAscii[i] = (byte)(cleanUin[i] < 128 ? cleanUin[i] : '?');
+                // TLV 0x02 — Roasted password
+                byte[] passwordBytes = Encoding.UTF8.GetBytes(_password);
+                byte[] roasted = RoastPassword(_password); // password — строка
+                Debug.WriteLine("[DirectAuth] Roasted password: " + BitConverter.ToString(roasted));
+                payload.AddRange(BuildTlv(0x02, roasted));
 
-                byte[] md5Input = new byte[9 + uinAscii.Length];
-                for (int i = 0; i < 9; i++) md5Input[i] = 0x00;
-                System.Buffer.BlockCopy(uinAscii, 0, md5Input, 9, uinAscii.Length);
-
-                var md5 = HashAlgorithmProvider.OpenAlgorithm(HashAlgorithmNames.Md5);
-                IBuffer hashBuf = md5.HashData(CryptographicBuffer.CreateFromByteArray(md5Input));
-                byte[] hashBytes;
-                CryptographicBuffer.CopyToByteArray(hashBuf, out hashBytes);
-                payload.AddRange(BuildTlv(0x4C, hashBytes));
-
-                // TLV 0x03 — Client ID
+                // TLV 0x03 — Client ID string
                 payload.AddRange(BuildTlv(0x03, Encoding.UTF8.GetBytes("ICQBasic")));
 
-                // Версия клиента и локаль
-                payload.AddRange(BuildTlv(0x16, new byte[] { 0x01, 0x0A }));
-                payload.AddRange(BuildTlv(0x17, new byte[] { 0x00, 0x14 }));
-                payload.AddRange(BuildTlv(0x18, new byte[] { 0x00, 0x34 }));
-                payload.AddRange(BuildTlv(0x19, new byte[] { 0x00, 0x00 }));
-                payload.AddRange(BuildTlv(0x1A, new byte[] { 0x0B, 0xB8 }));
-                payload.AddRange(BuildTlv(0x14, new byte[] { 0x00, 0x00, 0x04, 0x3D }));
+                // TLV 0x16..0x14 — версия клиента
+                payload.AddRange(BuildTlv(0x16, new byte[] { 0x01, 0x0A })); // Client ID
+                payload.AddRange(BuildTlv(0x17, new byte[] { 0x00, 0x14 })); // Major
+                payload.AddRange(BuildTlv(0x18, new byte[] { 0x00, 0x34 })); // Minor
+                payload.AddRange(BuildTlv(0x19, new byte[] { 0x00, 0x00 })); // Lesser
+                payload.AddRange(BuildTlv(0x1A, new byte[] { 0x0B, 0xB8 })); // Build
+                payload.AddRange(BuildTlv(0x14, new byte[] { 0x00, 0x00, 0x04, 0x3D })); // Distribution
+
+                // TLV 0x0F, 0x0E — Язык и страна
                 payload.AddRange(BuildTlv(0x0F, Encoding.UTF8.GetBytes("en")));
                 payload.AddRange(BuildTlv(0x0E, Encoding.UTF8.GetBytes("us")));
 
-                // Обязательный TLV от QIP
-                payload.AddRange(BuildTlv(0x5A, new byte[] { 0x01 }));
+                Debug.WriteLine("[DirectAuth] Sending login FLAP on channel 0x01...");
+                await SendFlapAsync(0x01, payload.ToArray());
 
-                // TLV 0x1D — Nickname
-                if (!string.IsNullOrEmpty(nickname))
-                    payload.AddRange(BuildTlv(0x1D, Encoding.UTF8.GetBytes(nickname)));
-
-                Debug.WriteLine("[DirectAuth] Sending login FLAP...");
-                await SendFlapAsync(0x02, payload.ToArray()); // <== канал 0x02, обязательно!
-
-                Debug.WriteLine("[DirectAuth] FLAP payload: " + BitConverter.ToString(payload.ToArray()));
                 Debug.WriteLine("[DirectAuth] Waiting for login response...");
                 var response = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(5));
 
-                if (response != null && response.Type == 0x02)
+                if (response != null && response.Type == 0x04)
                 {
-                    Debug.WriteLine("[DirectAuth] Login succeeded!");
+                    Debug.WriteLine($"[DirectAuth] Got FLAP type 0x04, Length={response.Data.Length}");
+
+                    bool redirectOk = await HandleBosRedirectAsync(response.Data, statusCode);
+                    if (!redirectOk)
+                    {
+                        Debug.WriteLine("[DirectAuth] Failed to handle BOS redirect.");
+                        return false;
+                    }
+
                     await InitializeOscarSessionAsync(statusCode);
                     await SetStatusAsync(statusCode);
+
+                    Debug.WriteLine("[DirectAuth] Bingo! Login and BOS session established successfully!");
                     return true;
+                }
+                else if (response != null)
+                {
+                    Debug.WriteLine($"[DirectAuth] Unexpected FLAP type: 0x{response.Type:X2}, Length={response.Data.Length}");
+                    return false;
                 }
                 else
                 {
-                    Debug.WriteLine("[DirectAuth] Login failed or no response");
+                    Debug.WriteLine("[DirectAuth] No response from server.");
                     return false;
                 }
             }
@@ -205,7 +205,6 @@ namespace kicq4WP
                 return false;
             }
         }
-
 
 
 
@@ -302,6 +301,24 @@ namespace kicq4WP
             }
         }
 
+        private byte[] RoastPassword(string password)
+        {
+            byte[] key = new byte[] { 0xF3, 0x26, 0x81, 0xC4, 0x39, 0x86, 0xDB, 0x92,
+                              0x71, 0xA3, 0xB9, 0xE6, 0x53, 0x7A, 0x95, 0x7C };
+
+            byte[] input = Encoding.UTF8.GetBytes(password);
+            byte[] roasted = new byte[input.Length];
+
+            for (int i = 0; i < input.Length; i++)
+            {
+                roasted[i] = (byte)(input[i] ^ key[i % key.Length]);
+            }
+
+            return roasted;
+        }
+
+
+
         private byte[] BuildFlapFrame(byte channel, byte[] data)
         {
             using (var ms = new MemoryStream())
@@ -323,6 +340,10 @@ namespace kicq4WP
             {
                 byte[] flap = BuildFlapFrame(channel, data);
 
+                Debug.WriteLine($"[SendFlap] Channel: 0x{channel:X2}, Data length: {data.Length}");
+                Debug.WriteLine($"[SendFlap] Data: {BitConverter.ToString(data)}");
+                Debug.WriteLine($"[SendFlap] Full FLAP frame: {BitConverter.ToString(flap)}");
+
                 if (_writer == null)
                 {
                     throw new InvalidOperationException("DataWriter not initialized");
@@ -331,6 +352,8 @@ namespace kicq4WP
                 _writer.WriteBytes(flap);
                 await _writer.StoreAsync();
                 await Task.Delay(300);
+
+                Debug.WriteLine($"[SendFlap] Successfully sent {flap.Length} bytes");
             }
             catch (Exception ex)
             {
@@ -363,17 +386,17 @@ namespace kicq4WP
         }
 
 
-        private async Task SendClientReadyAsync()
+       private async Task SendClientReadyAsync()
         {
             using (var ms = new MemoryStream())
             using (var writer = new BinaryWriter(ms))
             {
-                // 11 пар (Family ID + Version)
+                // 9 пар (Family ID + Version)
                 ushort[,] families = new ushort[,]
                 {
             {0x0001, 0x0003}, // Generic
-            {0x0002, 0x0001}, // Location
-            {0x0003, 0x0001}, // Buddy List
+            //{0x0002, 0x0001}, // Location
+            //{0x0003, 0x0001}, // Buddy List
             {0x0004, 0x0001}, // Messaging
             {0x0006, 0x0001}, // Chat
             {0x0008, 0x0001}, // BOS
@@ -395,38 +418,38 @@ namespace kicq4WP
                 Debug.WriteLine($"[ClientReady] Payload bytes: {BitConverter.ToString(data)}");
                 Debug.WriteLine($"[ClientReady] Total length: {data.Length} bytes");
 
-                await SendSnacAsync(0x01, 0x02, 0x0000, 0x0001, data);
+                await SendSnacAsync(0x01, 0x03, 0x0000, 0x0000, data);
                 Debug.WriteLine($"[ClientReady] Sent SNAC 0x01/0x02 (length={data.Length})");
             }
         }
 
 
-
-
-
-
         private async Task WaitForServerFamiliesAsync()
         {
-            for (int i = 0; i < 10; i++)
+            Debug.WriteLine("[BOS] Waiting for SNAC 0x0001/0x0003 from server...");
+
+            while (true)
             {
-                var flap = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(2));
+                var flap = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(5));
                 if (flap == null || flap.Type != 0x02 || flap.Data.Length < 10)
+                {
+                    Debug.WriteLine("[BOS] Invalid or empty FLAP");
                     continue;
+                }
 
                 ushort family = (ushort)((flap.Data[0] << 8) | flap.Data[1]);
                 ushort subtype = (ushort)((flap.Data[2] << 8) | flap.Data[3]);
 
-                Debug.WriteLine($"[FAM] SNAC {family:X4}/{subtype:X4}");
-
                 if (family == 0x0001 && subtype == 0x0003)
                 {
-                    Debug.WriteLine("[FAM] Server sent supported families. Proceeding.");
-                    return;
+                    Debug.WriteLine("[BOS] Received SNAC 0x0001/0x0003 — server families OK");
+                    break;
                 }
-            }
 
-            throw new Exception("Server did not respond with supported families.");
+                Debug.WriteLine($"[BOS] Unexpected SNAC 0x{family:X4}/0x{subtype:X4}, ignoring...");
+            }
         }
+
 
 
         private async Task<FlapFrame> ReceiveFlapAsync()
@@ -435,27 +458,24 @@ namespace kicq4WP
 
             try
             {
-                // Сбрасываем состояние Reader перед чтением нового пакета
                 _reader.InputStreamOptions = InputStreamOptions.Partial;
                 _reader.ByteOrder = ByteOrder.BigEndian;
 
-                // Вместо попытки установки UnconsumedBufferLength (который только для чтения)
-                // просто убеждаемся, что буфер пуст
-                if (_reader.UnconsumedBufferLength > 0)
-                {
-                    _reader.ReadBuffer(_reader.UnconsumedBufferLength);
-                }
-
-                // Читаем заголовок FLAP
-                uint loadedHeader = await _reader.LoadAsync(headerSize).AsTask().ConfigureAwait(false);
+                uint loadedHeader = await _reader.LoadAsync(headerSize);
                 if (loadedHeader < headerSize)
                 {
-                    throw new Exception($"[ReceiveFlap ERROR] FLAP header too short: {loadedHeader} bytes");
+                    if (_reader.UnconsumedBufferLength == 0 && loadedHeader == 0)
+                    {
+                        Debug.WriteLine("[ReceiveFlap] Connection closed by server");
+                        return null;
+                    }
+                    throw new Exception($"[ReceiveFlap] FLAP header too short: {loadedHeader} bytes");
                 }
 
-                if (_reader.ReadByte() != 0x2A)
+                byte marker = _reader.ReadByte();
+                if (marker != 0x2A)
                 {
-                    throw new System.Net.ProtocolViolationException("Invalid FLAP signature");
+                    throw new ProtocolViolationException($"Invalid FLAP signature: 0x{marker:X2}");
                 }
 
                 var frame = new FlapFrame
@@ -465,22 +485,23 @@ namespace kicq4WP
                     DataLength = _reader.ReadUInt16()
                 };
 
+                Debug.WriteLine($"[ReceiveFlap] Type: 0x{frame.Type:X2}, Seq: {frame.Sequence}, Length: {frame.DataLength}");
+
                 if (frame.DataLength > 0)
                 {
-                    // Читаем тело пакета
-                    uint loadedBody = await _reader.LoadAsync(frame.DataLength).AsTask().ConfigureAwait(false);
+                    uint loadedBody = await _reader.LoadAsync(frame.DataLength);
                     if (loadedBody < frame.DataLength)
                     {
-                        throw new Exception($"[ReceiveFlap ERROR] Expected {frame.DataLength} bytes, got {loadedBody}");
+                        throw new Exception($"[ReceiveFlap] Expected {frame.DataLength} bytes, got {loadedBody}");
                     }
 
                     frame.Data = new byte[frame.DataLength];
                     _reader.ReadBytes(frame.Data);
-                    Debug.WriteLine($"[RECV] FLAP {frame.Type:X2}, Length: {frame.DataLength}, Data: {BitConverter.ToString(frame.Data)}");
+
+                    Debug.WriteLine($"[ReceiveFlap] Data: {BitConverter.ToString(frame.Data)}");
                 }
                 else
                 {
-                    // Заменяем Array.Empty<byte>() на создание нового пустого массива
                     frame.Data = new byte[0];
                 }
 
@@ -523,14 +544,24 @@ namespace kicq4WP
                     ushort type = (ushort)((typeBytes[0] << 8) | typeBytes[1]);
                     ushort length = (ushort)((lengthBytes[0] << 8) | lengthBytes[1]);
 
+                    Debug.WriteLine($"[ParseTLV] Type: 0x{type:X4}, Length: {length}");
+
                     if (ms.Position + length > ms.Length)
                     {
+                        Debug.WriteLine($"[ParseTLV ERROR] TLV length {length} exceeds remaining data at position {ms.Position}");
                         throw new System.Net.ProtocolViolationException($"TLV length {length} exceeds remaining data");
                     }
 
                     byte[] value = new byte[length];
-                    ms.Read(value, 0, length);
+                    int bytesRead = ms.Read(value, 0, length);
 
+                    if (bytesRead != length)
+                    {
+                        Debug.WriteLine($"[ParseTLV ERROR] Expected {length} bytes, read {bytesRead}");
+                        throw new System.Net.ProtocolViolationException($"Failed to read complete TLV value");
+                    }
+
+                    Debug.WriteLine($"[ParseTLV] TLV 0x{type:X4}: {BitConverter.ToString(value)}");
                     dict[type] = new TLV(type, value);
                 }
             }
@@ -542,8 +573,8 @@ namespace kicq4WP
             Debug.WriteLine("[Init] Starting OSCAR session initialization...");
 
             // 1. Client Ready — MUST go first
-            await SendClientReadyAsync();
-            Debug.WriteLine("[Init] Sent ClientReady");
+            //await SendClientReadyAsync();
+            //Debug.WriteLine("[Init] Sent ClientReady");
 
 
             // 2. Wait for Server Supported Families: SNAC 0x01/0x03
@@ -592,9 +623,7 @@ namespace kicq4WP
             Debug.WriteLine("[Init] OSCAR session initialization complete.");
         }
 
-
-
-
+        
 
 
         public async Task<List<string>> GetContactsAsync()
@@ -624,6 +653,179 @@ namespace kicq4WP
                 Debug.WriteLine($"[GetContacts ERROR] {ex.Message}");
                 return new List<string>();
             }
+        }
+
+        private async Task<bool> ConnectToBosAsync(string bosHostPort, byte[] cookieBytes, uint statusCode)
+        {
+            try
+            {
+                Debug.WriteLine("[BOS] Connecting to BOS server " + bosHostPort);
+
+                string[] parts = bosHostPort.Split(':');
+                string host = parts[0];
+                string port = parts.Length > 1 ? parts[1] : "5190";
+
+                // Закрываем предыдущее соединение
+                _socket?.Dispose();
+
+                // Создаем новое соединение
+                _socket = new StreamSocket();
+                await _socket.ConnectAsync(new HostName(host), port);
+
+                _writer = new DataWriter(_socket.OutputStream);
+                _reader = new DataReader(_socket.InputStream)
+                {
+                    InputStreamOptions = InputStreamOptions.Partial,
+                    ByteOrder = ByteOrder.BigEndian
+                };
+
+                Debug.WriteLine($"[BOS] Cookie length: {cookieBytes.Length}");
+                Debug.WriteLine($"[BOS] Cookie (hex): {BitConverter.ToString(cookieBytes)}");
+
+                Debug.WriteLine("[BOS] Waiting for server hello (FLAP 0x01)...");
+                var hello = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(10));
+                if (hello == null || hello.Type != 0x01)
+                {
+                    Debug.WriteLine("[BOS] No server hello received.");
+                    return false;
+                }
+
+                Debug.WriteLine("[BOS] Received server hello. Sending cli_cookie...");
+                Debug.WriteLine($"[BOS] Sending cookie: {BitConverter.ToString(cookieBytes)}");
+
+                await SendFlapAsync(0x01, cookieBytes);
+
+                Debug.WriteLine("[BOS] Cookie sent. Waiting for response...");
+
+                var response = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(15));
+
+                if (response == null)
+                {
+                    Debug.WriteLine("[BOS] No response from server after sending cookie.");
+                    return false;
+                }
+
+                Debug.WriteLine($"[BOS] Received response: Type={response.Type}, Length={response.Data.Length}");
+
+                if (response.Type == 0x02 && response.Data.Length >= 10)
+                {
+                    ushort family = (ushort)((response.Data[0] << 8) | response.Data[1]);
+                    ushort subtype = (ushort)((response.Data[2] << 8) | response.Data[3]);
+
+                    Debug.WriteLine($"[BOS] Received SNAC: 0x{family:X4}/0x{subtype:X4}");
+
+                    if (family == 0x0001 && subtype == 0x0003)
+                    {
+                        Debug.WriteLine("[BOS] Successfully connected to BOS server!");
+                        return true;
+                    }
+                }
+
+                Debug.WriteLine("[BOS] Unexpected response from server.");
+                Debug.WriteLine($"[BOS] Response data: {BitConverter.ToString(response.Data)}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[BOS ERROR] {ex.Message}");
+                return false;
+            }
+        }
+
+        private async Task<bool> HandleBosRedirectAsync(byte[] data, uint statusCode)
+        {
+            Debug.WriteLine("[Redirect] Parsing BOS redirect packet...");
+            Debug.WriteLine($"[Redirect] Raw TLV data: {BitConverter.ToString(data)}");
+
+            var tlvs = ParseTlvs(data);
+
+            if (!tlvs.ContainsKey(0x0005) || !tlvs.ContainsKey(0x0006))
+            {
+                Debug.WriteLine("[Redirect] Required TLVs not found.");
+                return false;
+            }
+
+            var bosHostTlv = tlvs[0x0005];
+            var cookieTlv = tlvs[0x0006];
+
+            // BOS host - это строка UTF-8
+            string bosHost = Encoding.UTF8.GetString(bosHostTlv.Value, 0, bosHostTlv.Value.Length);
+
+            // Cookie - бинарные данные, не трогаем!
+            byte[] cookieBytes = cookieTlv.Value;
+
+            Debug.WriteLine($"[Redirect] BOS Host: {bosHost}");
+            Debug.WriteLine($"[Redirect] Cookie TLV length: {cookieTlv.Value.Length}");
+            Debug.WriteLine($"[Redirect] Cookie (hex): {BitConverter.ToString(cookieBytes)}");
+
+            if (await ConnectToBosAsync(bosHost, cookieBytes, statusCode))
+            {
+                Debug.WriteLine("[Redirect] BOS connect successful.");
+                await InitializeOscarSessionAsync(statusCode);
+                await SetStatusAsync(statusCode);
+                return true;
+            }
+
+            Debug.WriteLine("[Redirect] Failed to connect to BOS server.");
+            return false;
+        }
+
+
+        private byte[] TrimNullBytes(byte[] input)
+        {
+            int start = 0;
+            while (start < input.Length && input[start] == 0)
+                start++;
+
+            int end = input.Length - 1;
+            while (end >= 0 && input[end] == 0)
+                end--;
+
+            if (start > end)
+                return new byte[0];
+
+            byte[] result = new byte[end - start + 1];
+            System.Buffer.BlockCopy(input, start, result, 0, result.Length);
+            return result;
+        }
+
+
+        private async Task<bool> WaitForRedirectOrBosAsync(uint statusCode)
+        {
+            Debug.WriteLine("[Login] Waiting for redirect or BOS connect...");
+
+            while (true)
+            {
+                var flap = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(5));
+                if (flap == null)
+                {
+                    Debug.WriteLine("[Login] No FLAP response");
+                    return false;
+                }
+
+                if (flap.Type == 0x04)
+                {
+                    Debug.WriteLine($"[Login] Got redirect FLAP (0x04), Length: {flap.Data.Length}");
+                    return await HandleBosRedirectAsync(flap.Data, statusCode);
+                }
+
+                Debug.WriteLine($"[Login] Ignoring unexpected FLAP type: 0x{flap.Type:X2}");
+            }
+        }
+
+
+
+
+        public async Task<bool> AuthenticateAndInitializeAsync(string nickname, uint statusCode)
+        {
+            if (!await AuthenticateAsync(statusCode))
+                return false;
+
+            if (!await WaitForRedirectOrBosAsync(statusCode))
+                return false;
+
+            await InitializeOscarSessionAsync(statusCode);
+            return true;
         }
 
         public async Task SendCapabilitiesAsync()
@@ -720,6 +922,18 @@ namespace kicq4WP
                 Debug.WriteLine($"[SNAC] Server responded: 0x{family:X4}/0x{subtype:X4}, Data: {BitConverter.ToString(flap.Data)}");
             }
         }
+
+        private byte[] GetPseudoAsciiBytes(string input)
+        {
+            byte[] result = new byte[input.Length];
+            for (int i = 0; i < input.Length; i++)
+            {
+                char c = input[i];
+                result[i] = (byte)(c <= 0x7F ? c : '?');
+            }
+            return result;
+        }
+
 
         private class FlapFrame
         {
