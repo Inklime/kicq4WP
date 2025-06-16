@@ -6,6 +6,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 using Windows.UI.Popups;
+using System.Diagnostics;
 
 namespace kicq4WP
 {
@@ -25,39 +26,58 @@ namespace kicq4WP
         {
             base.OnNavigatedTo(e);
 
-            if (e.Parameter is OscarProtocol)
+            // 1. Приведение типа с проверкой
+            var oscarProtocol = e.Parameter as OscarProtocol;
+
+            // 2. Проверка на null перед использованием
+            if (oscarProtocol == null)
             {
-                var protocol = (OscarProtocol)e.Parameter;
-                _oscarProtocol = protocol;
-                LoadContacts();
+                Debug.WriteLine("Error: Navigation parameter is not OscarProtocol");
+                return;
             }
+
+            // 3. Присваивание полю класса только после проверки
+            _oscarProtocol = oscarProtocol;
+
+            Debug.WriteLine($"Setting login: {_oscarProtocol.UIN}");
+
+            // 5. Основная логика
+            LoadContacts();
+            UinTextBlock.Text = _oscarProtocol.UIN;
         }
+
 
         private async void LoadContacts()
         {
             try
             {
                 Contacts.Clear();
+                Debug.WriteLine("Contacts list cleared (stub implementation)");
 
-                // Используем метод GetContactsAsync из OscarProtocol
-                var contactUins = await _oscarProtocol.GetContactsAsync();
-
-                foreach (var uin in contactUins)
-                {
-                    Contacts.Add(new Contact { Uin = uin, Name = uin }); // Можно добавить логику для получения имени контакта
-                }
+                // Здесь позже будет реальная загрузка контактов
             }
             catch (Exception ex)
             {
-                var dialog = new MessageDialog($"Ошибка загрузки контактов: {ex.Message}");
-                await dialog.ShowAsync();
+                Debug.WriteLine($"Error in LoadContacts: {ex.Message}");
             }
         }
 
         private async void LogoutButton_Click(object sender, RoutedEventArgs e)
         {
+            var proto = ((App)Application.Current).CurrentOscarProtocol;
+
+            if (proto != null)
+            {
+                await proto.DisconnectAsync();
+                ((App)Application.Current).CurrentOscarProtocol = null;
+            }
+
             Frame.Navigate(typeof(LoginPage));
         }
+
+      
+
+
         private async void StatusComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             var comboBox = sender as ComboBox;
@@ -78,6 +98,37 @@ namespace kicq4WP
                     }
                 }
             }
+        }
+        private async Task ShowErrorDialog(string message)
+        {
+            var dialog = new MessageDialog(message);
+            await dialog.ShowAsync();
+        }
+
+        private async void AcInfButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+
+        private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+
+        private async void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(InfoPage));
+        }
+
+        private async void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+
+        private void CommandBar_Opened(object sender, object e)
+        {
+            // Например, логирование
+            System.Diagnostics.Debug.WriteLine("AppBar открыт.");
         }
 
         private void ContactsListView_ItemClick(object sender, ItemClickEventArgs e)

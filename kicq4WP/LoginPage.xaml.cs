@@ -28,44 +28,76 @@ namespace kicq4WP
 
             LoginTextBox.Text = savedLogin;
             PasswordBox.Password = savedPassword;
-            NicknameTextBox.Text = savedNickname;
         }
 
         private async void OnlOpenButton_Click(object sender, RoutedEventArgs e)
         {
             Frame.Navigate(typeof(MainPage));
         }
+
+
+
         private async void LoginButton_Click(object sender, RoutedEventArgs e)
         {
             uint statusCode = GetSelectedStatusCode();
             string login = LoginTextBox.Text?.Trim();
             string password = PasswordBox.Password?.Trim();
-            string nickname = NicknameTextBox.Text?.Trim();
+            LoadingOverlay.Visibility = Visibility.Visible;
+            Debug.WriteLine($"LoginButton clicked: Login={login}");
 
-            Debug.WriteLine($"LoginButton clicked: Login={login}, Nickname={nickname}");
-
-            if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(nickname))
+            if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
             {
-                await ShowMessageDialog("Заполните все поля: Логин, Пароль и Никнейм.");
+                await ShowMessageDialog("Заполните все поля: UIN и пароль.");
                 return;
             }
 
-            _oscarProtocol = new OscarProtocol(login, password); // <-- ВАЖНО!
+            _oscarProtocol = new OscarProtocol(login, password);
+            _oscarProtocol.StatusUpdater = UpdateStatusText;
             Debug.WriteLine($"OscarProtocol instance created with UIN: {login}");
 
-            bool success = await _oscarProtocol.AuthenticateAsync(nickname, statusCode);
+            bool success = await _oscarProtocol.AuthenticateAsync(statusCode);
+            
             if (success)
             {
                 Debug.WriteLine("Authentication succeeded");
 
                 SettingsManager.SaveSetting("Login", login);
                 SettingsManager.SaveSetting("Password", password);
-                SettingsManager.SaveSetting("Nickname", nickname);
 
-                Frame.Navigate(typeof(MainPage));
+                try
+                {
+                    await _oscarProtocol.InitializeOscarSessionAsync(statusCode);
+                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    // Навигация только если инициализация прошла успешно
+                    Frame.Navigate(typeof(MainPage), _oscarProtocol);
+                }
+                catch (TimeoutException)
+                {
+                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    await ShowMessageDialog("Сервер не ответил вовремя. Повторите попытку позже.");
+                }
+                catch (Exception ex)
+                {
+                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    await ShowMessageDialog("Ошибка при инициализации сессии: " + ex.Message);
+                }
             }
-
+            else
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                await ShowMessageDialog("Ошибка авторизации. Проверьте логин и пароль.");
+            }
         }
+
+        public async void UpdateStatusText(string text)
+        {
+            // Выполнение кода на UI-потоке
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+             {
+                 StatusTextBlock.Text = text;
+             });
+        }
+
 
         private uint GetSelectedStatusCode()
         {
@@ -91,7 +123,38 @@ namespace kicq4WP
         }
 
 
+        private async Task ShowErrorDialog(string message)
+        {
+            var dialog = new MessageDialog(message);
+            await dialog.ShowAsync();
+        }
+      
 
+        private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+
+        private async void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(InfoPage));
+        }
+
+        private async void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+
+        private async void RegButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("К сожалению зарегистрироваться в kicq через приложение пока что невозможно, есть два способа зарегистрировать uin, инструкция регистрации есть на сайте: abrbus.ru/kicq.htm");
+        }
+
+        private void CommandBar_Opened(object sender, object e)
+        {
+            // Например, логирование
+            System.Diagnostics.Debug.WriteLine("AppBar открыт.");
+        }
 
         private async Task ShowMessageDialog(string message)
         {
@@ -99,5 +162,7 @@ namespace kicq4WP
             var dialog = new MessageDialog(message);
             await dialog.ShowAsync();
         }
+
+       
     }
 }

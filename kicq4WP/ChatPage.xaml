@@ -7,7 +7,20 @@
     mc:Ignorable="d"
     Background="#FF121212">
     <!-- Темный фон -->
+    <Page.BottomAppBar>
+        <CommandBar IsSticky="True" Opened="CommandBar_Opened">
+            <!-- Кнопки в нижней панели -->
+            <AppBarButton Icon="Send" Label="Отправить" Click="SmileButton_Click"/>
+            <AppBarButton Icon="Emoji2" Label="Отправить" Click="SmileButton_Click"/>
 
+            <!-- Вторичное меню -->
+            <CommandBar.SecondaryCommands>
+                <AppBarButton Icon="Setting" Label="Настройки" Click="SettingsButton_Click"/>
+                <AppBarButton Icon="Help" Label="Справка" Click="HelpButton_Click"/>
+                <AppBarButton Icon="Cancel" Label="Выход" Click="ExitButton_Click"/>
+            </CommandBar.SecondaryCommands>
+        </CommandBar>
+    </Page.BottomAppBar>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -61,15 +74,7 @@
                      KeyDown="MessageTextBox_KeyDown"/>
 
             <!-- Кнопка - темно-синий цвет -->
-            <Button Content="Отправить"
-                    Grid.Column="1"
-                    Click="SendMessage_Click"
-                    Margin="12"
-                    MinWidth="100"
-                    Height="48"
-                    Background="#045e01"
-                    Foreground="White"
-                    BorderBrush="#FF3A5FCD"/>
+            
             <!-- Светло-синяя граница -->
         </Grid>
     </Grid>

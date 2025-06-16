@@ -13,7 +13,9 @@ namespace kicq4WP
         {
             this.InitializeComponent();
             this.Suspending += OnSuspending;
+
         }
+        public OscarProtocol CurrentOscarProtocol { get; set; }
 
         protected override void OnLaunched(LaunchActivatedEventArgs e)
         {

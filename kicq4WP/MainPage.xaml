@@ -7,32 +7,33 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Page.BottomAppBar>
+        <CommandBar IsSticky="True" Opened="CommandBar_Opened">
+            <!-- Кнопки в нижней панели -->
+            <AppBarButton Icon="Cancel" Label="Выйти" Click="LogoutButton_Click"/>
+            <AppBarButton Icon="Contact" Label="Акк. Инфо" Click="AcInfButton_Click"/>
+
+
+
+            <!-- Вторичное меню -->
+            <CommandBar.SecondaryCommands>
+                <AppBarButton Icon="Setting" Label="Настройки" Click="SettingsButton_Click"/>
+                <AppBarButton Icon="Help" Label="Справка" Click="HelpButton_Click"/>
+                <AppBarButton Icon="Cancel" Label="Выход" Click="ExitButton_Click"/>
+            </CommandBar.SecondaryCommands>
+        </CommandBar>
+    </Page.BottomAppBar>
 
     <Grid>
-        <ComboBox x:Name="StatusComboBox" SelectedIndex="0" Margin="10,578,190,12">
-            <ComboBoxItem Content="Онлайн" />
-            <ComboBoxItem Content="Готов поболтать" />
-            <ComboBoxItem Content="Отошел" />
-            <ComboBoxItem Content="Недоступен" />
-            <ComboBoxItem Content="Занят" />
-            <ComboBoxItem Content="Не беспокоить" />
-            <ComboBoxItem Content="Дома" />
-            <ComboBoxItem Content="Работа" />
-            <ComboBoxItem Content="Кушаю" />
-            <ComboBoxItem Content="Депрессия" />
-            <ComboBoxItem Content="Злой" />
-            <ComboBoxItem Content="Невидимый" />
-            <ComboBoxItem Content="Невидимый для всех" />
-        </ComboBox>
-
-        <Button x:Name="LogoutButton" Content="Выйти" Width="110" Height="24"
-                HorizontalAlignment="Center" VerticalAlignment="Top"
-                Margin="275,579,15,0"
-                Background="Black" Foreground="White"
-                Click="LogoutButton_Click"/>
+        <TextBlock x:Name="UinTextBlock"
+       FontSize="30"
+       Foreground="White"
+       Margin="14,10,10,0"
+       VerticalAlignment="Top"
+       Text="Offline" />
 
         <ListView x:Name="ContactsListView" ItemClick="ContactsListView_ItemClick" 
-                  IsItemClickEnabled="True" Margin="10,-2,10,72">
+                  IsItemClickEnabled="True" Margin="10,51,10,19">
             <ListView.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">

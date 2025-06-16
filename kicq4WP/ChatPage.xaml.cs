@@ -100,6 +100,30 @@ namespace kicq4WP
                 await ShowErrorDialog($"Ошибка отправки: {ex.Message}");
             }
         }
+        private async void SmileButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+
+        private async void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+
+        private async void HelpButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(InfoPage));
+        }
+
+        private async void ExitButton_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+        }
+        private void CommandBar_Opened(object sender, object e)
+        {
+            // Например, логирование
+            System.Diagnostics.Debug.WriteLine("AppBar открыт.");
+        }
 
         private async Task ShowErrorDialog(string message)
         {
