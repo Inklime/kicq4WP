@@ -26,19 +26,18 @@ namespace kicq4WP
         {
             base.OnNavigatedTo(e);
 
-            if (e.Parameter is Tuple<Contact, OscarProtocol>)
+            var contact = e.Parameter as Contact;
+            if (contact != null)
             {
-                var parameters = (Tuple<Contact, OscarProtocol>)e.Parameter;
-                _contact = parameters.Item1;
-                _oscarProtocol = parameters.Item2;
+                _contact = contact;
+                _oscarProtocol = ((App)Application.Current).Oscar;
 
-                if (_contact != null)
-                {
-                    ContactNameTextBlock.Text = $"Чат с {_contact.Name}";
-                    LoadMessageHistory();
-                }
+                ContactNameTextBlock.Text = $"{_contact.Name}";
+                LoadMessageHistory();
             }
         }
+
+
 
         private async void LoadMessageHistory()
         {
@@ -65,6 +64,14 @@ namespace kicq4WP
             {
                 await SendMessageAsync();
                 e.Handled = true;
+            }
+        }
+
+        private void BackButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (Frame.CanGoBack)
+            {
+                Frame.GoBack();
             }
         }
 

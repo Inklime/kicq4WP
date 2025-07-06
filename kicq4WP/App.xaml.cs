@@ -9,6 +9,8 @@ namespace kicq4WP
 {
     sealed partial class App : Application
     {
+        public OscarProtocol Oscar { get; set; }
+
         public App()
         {
             this.InitializeComponent();

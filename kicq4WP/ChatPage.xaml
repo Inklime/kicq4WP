@@ -10,8 +10,8 @@
     <Page.BottomAppBar>
         <CommandBar IsSticky="True" Opened="CommandBar_Opened">
             <!-- Кнопки в нижней панели -->
-            <AppBarButton Icon="Send" Label="Отправить" Click="SmileButton_Click"/>
-            <AppBarButton Icon="Emoji2" Label="Отправить" Click="SmileButton_Click"/>
+            <AppBarButton Icon="Send" Label="Отправить" Click="SendMessage_Click"/>
+            <AppBarButton Icon="Emoji2" Label="Смайлики" Click="SmileButton_Click"/>
 
             <!-- Вторичное меню -->
             <CommandBar.SecondaryCommands>
@@ -29,13 +29,33 @@
         </Grid.RowDefinitions>
 
         <!-- Заголовок - темно-синий цвет -->
+        <!-- Заголовок - темно-синий цвет -->
         <Grid Grid.Row="0" Background="#045e01">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Кнопка "Назад" -->
+            <Button x:Name="BackButton"
+            Grid.Column="0"
+            Height="31"
+            Margin="-31,1,10.333,-1"
+            Background="Transparent"
+            BorderThickness="0"
+            Click="BackButton_Click" HorizontalAlignment="Stretch">
+                <Path Data="M15.41,16.58L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.58Z"
+              Fill="White"
+              Stretch="Uniform"/>
+            </Button>
+
+            <!-- Имя контакта -->
             <TextBlock x:Name="ContactNameTextBlock"
-                       Text="Имя контакта"
-                       FontSize="28"
-                       Margin="24,12"
-                       Foreground="White"
-                       VerticalAlignment="Center"/>
+               Text="Имя контакта"
+               FontSize="28"
+               Margin="53,12,59,12"
+               Foreground="White"
+               VerticalAlignment="Center" Grid.ColumnSpan="2"/>
         </Grid>
 
         <!-- Область сообщений -->
@@ -66,7 +86,7 @@
 
             <TextBox x:Name="MessageTextBox"
                      Grid.Column="0"
-                     Margin="12"
+                     Margin="14,10,10,14"
                      VerticalAlignment="Center"
                      PlaceholderText="Введите сообщение..."
                      Background="#FF333333"
@@ -74,7 +94,7 @@
                      KeyDown="MessageTextBox_KeyDown"/>
 
             <!-- Кнопка - темно-синий цвет -->
-            
+
             <!-- Светло-синяя граница -->
         </Grid>
     </Grid>

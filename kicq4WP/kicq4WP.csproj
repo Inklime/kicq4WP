@@ -87,6 +87,8 @@
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
+    <Compile Include="BoolToVisibilityConverter.cs" />
+    <Compile Include="ContactStorage.cs" />
     <Compile Include="InfoPage.xaml.cs">
       <DependentUpon>InfoPage.xaml</DependentUpon>
     </Compile>
@@ -103,6 +105,13 @@
       <DependentUpon>MainPage.xaml</DependentUpon>
     </Compile>
     <Compile Include="Message.cs" />
+    <Compile Include="OscarParts\Snacs\BuddyListService.cs" />
+    <Compile Include="OscarParts\Snacs\LocationService.cs" />
+    <Compile Include="OscarParts\Snacs\MessagingService.cs" />
+    <Compile Include="OscarParts\Snacs\PrivacyService.cs" />
+    <Compile Include="OscarParts\Snacs\Snac0107RateInfo.cs" />
+    <Compile Include="OscarParts\Snacs\Snac0117.cs" />
+    <Compile Include="OscarParts\Snacs\SsiService.cs" />
     <Compile Include="OscarProtocol.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SettingsManager.cs" />
@@ -113,14 +122,73 @@
     </AppxManifest>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Assets\icons\added.png" />
+    <Content Include="Assets\icons\newmsg.png" />
     <Content Include="Assets\Logo.scale-100.png" />
     <Content Include="Assets\Logo.scale-140.png" />
     <Content Include="Assets\Logo.scale-240.png" />
     <Content Include="Assets\SmallLogo.scale-240.png" />
+    <Content Include="Assets\sounds\sndAuth.wav" />
+    <Content Include="Assets\sounds\sndGlobal.wav" />
+    <Content Include="Assets\sounds\sndMsg.wav" />
+    <Content Include="Assets\sounds\sndMsgSent.wav" />
+    <Content Include="Assets\sounds\sndPlugin.wav" />
+    <Content Include="Assets\sounds\sndRemSelf.wav" />
+    <Content Include="Assets\sounds\sndSrvMsg.wav" />
+    <Content Include="Assets\sounds\sndStartup.wav" />
+    <Content Include="Assets\sounds\sndSystem.wav" />
     <Content Include="Assets\SplashScreen.scale-240.png" />
     <Content Include="Assets\Square71x71Logo.scale-240.png" />
+    <Content Include="Assets\statuses\away.png" />
+    <Content Include="Assets\statuses\busy.png" />
+    <Content Include="Assets\statuses\depressed.png" />
+    <Content Include="Assets\statuses\dnd.png" />
+    <Content Include="Assets\statuses\eating.png" />
+    <Content Include="Assets\statuses\evil.png" />
+    <Content Include="Assets\statuses\f4c.png" />
+    <Content Include="Assets\statuses\home.png" />
+    <Content Include="Assets\statuses\ifa.png" />
+    <Content Include="Assets\statuses\inv.png" />
+    <Content Include="Assets\statuses\na.png" />
+    <Content Include="Assets\statuses\offline.png" />
+    <Content Include="Assets\statuses\online.png" />
+    <Content Include="Assets\statuses\work.png" />
     <Content Include="Assets\StoreLogo.scale-240.png" />
     <Content Include="Assets\WideLogo.scale-240.png" />
+    <Content Include="Assets\xtraz\angry.png" />
+    <Content Include="Assets\xtraz\bath.png" />
+    <Content Include="Assets\xtraz\beer.png" />
+    <Content Include="Assets\xtraz\business.png" />
+    <Content Include="Assets\xtraz\camera.png" />
+    <Content Include="Assets\xtraz\coffee.png" />
+    <Content Include="Assets\xtraz\cpc.png" />
+    <Content Include="Assets\xtraz\eating.png" />
+    <Content Include="Assets\xtraz\friends.png" />
+    <Content Include="Assets\xtraz\funny.png" />
+    <Content Include="Assets\xtraz\game.png" />
+    <Content Include="Assets\xtraz\heart.png" />
+    <Content Include="Assets\xtraz\internet.png" />
+    <Content Include="Assets\xtraz\mobph.png" />
+    <Content Include="Assets\xtraz\music.png" />
+    <Content Include="Assets\xtraz\paper.png" />
+    <Content Include="Assets\xtraz\party.png" />
+    <Content Include="Assets\xtraz\phone.png" />
+    <Content Include="Assets\xtraz\qm.png" />
+    <Content Include="Assets\xtraz\redthing.png" />
+    <Content Include="Assets\xtraz\search.png" />
+    <Content Include="Assets\xtraz\shashlik.png" />
+    <Content Include="Assets\xtraz\shopping.png" />
+    <Content Include="Assets\xtraz\sleep.png" />
+    <Content Include="Assets\xtraz\sleepy.png" />
+    <Content Include="Assets\xtraz\study.png" />
+    <Content Include="Assets\xtraz\surf.png" />
+    <Content Include="Assets\xtraz\temp.png" />
+    <Content Include="Assets\xtraz\think.png" />
+    <Content Include="Assets\xtraz\tired.png" />
+    <Content Include="Assets\xtraz\tv.png" />
+    <Content Include="Assets\xtraz\type.png" />
+    <Content Include="Assets\xtraz\work.png" />
+    <Content Include="Assets\xtraz\write.png" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">

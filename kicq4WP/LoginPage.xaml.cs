@@ -12,7 +12,7 @@ namespace kicq4WP
     public sealed partial class LoginPage : Page
     {
         private OscarProtocol _oscarProtocol;
-        public uint _selectedStatusCode = 0x00000000;
+        public uint _selectedStatusCode = 0x0000;
 
         public LoginPage()
         {
@@ -51,7 +51,8 @@ namespace kicq4WP
                 return;
             }
 
-            _oscarProtocol = new OscarProtocol(login, password);
+            _oscarProtocol = new OscarProtocol(login, password, this.Dispatcher);
+            ((App)Application.Current).Oscar = _oscarProtocol;
             _oscarProtocol.StatusUpdater = UpdateStatusText;
             Debug.WriteLine($"OscarProtocol instance created with UIN: {login}");
 
@@ -66,7 +67,7 @@ namespace kicq4WP
 
                 try
                 {
-                    await _oscarProtocol.InitializeOscarSessionAsync(statusCode);
+                    await _oscarProtocol.SendSetStatusAsync(statusCode);
                     LoadingOverlay.Visibility = Visibility.Collapsed;
                     // Навигация только если инициализация прошла успешно
                     Frame.Navigate(typeof(MainPage), _oscarProtocol);
@@ -74,7 +75,7 @@ namespace kicq4WP
                 catch (TimeoutException)
                 {
                     LoadingOverlay.Visibility = Visibility.Collapsed;
-                    await ShowMessageDialog("Сервер не ответил вовремя. Повторите попытку позже.");
+                    await ShowMessageDialog("Сервер не ответил вовремя или у вас проблемы с интернетом. Повторите попытку позже.");
                 }
                 catch (Exception ex)
                 {
@@ -106,19 +107,19 @@ namespace kicq4WP
 
             switch (statusText)
             {
-                case "Готов поболтать": return 0x00000010;
-                case "Отошел": return 0x00000020;
-                case "Недоступен": return 0x00000030;
-                case "Занят": return 0x00000040;
-                case "Не беспокоить": return 0x00000050;
-                case "Дома": return 0x00000060;
-                case "Работа": return 0x00000070;
-                case "Кушаю": return 0x00000080;
-                case "Депрессия": return 0x00000090;
-                case "Злой": return 0x000000A0;
-                case "Невидимый": return 0x00000100;
-                case "Невидимый для всех": return 0x00010100;
-                default: return 0x00000000;
+                case "Готов поболтать": return 0x000020;
+                case "Отошел": return 0x000001;
+                case "Недоступен": return 0x000004;
+                case "Занят": return 0x000010;
+                case "Не беспокоить": return 0x000002;
+                case "Дома": return 0x000060;
+                case "Работа": return 0x000070;
+                case "Кушаю": return 0x000080;
+                case "Депрессия": return 0x000090;
+                case "Злой": return 0x0000A0;
+                case "Невидимый": return 0x000100;
+                case "Невидимый для всех": return 0x000100;
+                default: return 0x000000;
             }
         }
 
