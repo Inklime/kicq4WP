@@ -1,0 +1,8 @@
+﻿[ResourceMetadata]
+"ResourceId"			"split.scale-100"
+"ResourceDimensions"		"scale-100"
+
+[Files]
+"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\split.scale-100.pri"			"resources.pri"
+"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\Assets\WideLogo.scale-100.png"			"Assets\WideLogo.scale-100.png"
+"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\Assets\Logo.scale-100.png"			"Assets\Logo.scale-100.png"

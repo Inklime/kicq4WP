@@ -1,0 +1,138 @@
+﻿<Page
+    x:Class="kicq4WP.LoginPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:kicq4WP"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="#FF0D1117">
+
+    <Page.BottomAppBar>
+        <CommandBar IsSticky="True" Background="#FF0078D7">
+            <AppBarButton x:ConnectionId='1' Icon="Permissions" Label="Войти"                           Foreground="White"/>
+            <AppBarButton x:ConnectionId='2' Icon="Edit" Label="Регистр."                         Foreground="White"/>
+            <CommandBar.SecondaryCommands>
+                <AppBarButton x:ConnectionId='3' Icon="Setting" Label="Настройки"                             />
+                <AppBarButton x:ConnectionId='4' Icon="Help" Label="Справка"                         />
+                <AppBarButton x:ConnectionId='5' Icon="Cancel" Label="Выход"                         />
+            </CommandBar.SecondaryCommands>
+        </CommandBar>
+    </Page.BottomAppBar>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <StackPanel VerticalAlignment="Center" Margin="28,40,28,20">
+
+                <!-- Лого -->
+                <StackPanel HorizontalAlignment="Center" Margin="0,0,0,40">
+                    <Image Source="ms-appx:///Assets/Medlogo.png" Width="200" Height="124" />
+                    <TextBlock Text="KICQ"
+                               FontSize="32"
+                               FontWeight="Light"
+                               FontFamily="Segoe WP"
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               Margin="0,8,0,0"
+                               CharacterSpacing="300"/>
+                    <TextBlock Text="для Windows Phone"
+                               FontSize="14"
+                               FontFamily="Segoe WP"
+                               Foreground="#88FFFFFF"
+                               HorizontalAlignment="Center"
+                               Margin="0,2,0,0"/>
+                </StackPanel>
+
+                <!-- UIN -->
+                <TextBlock Text="UIN"
+                           FontSize="14"
+                           FontFamily="Segoe WP"
+                           Foreground="#AAFFFFFF"
+                           Margin="0,0,0,4"/>
+                <TextBox x:Name="LoginTextBox"
+                         PlaceholderText="Введите UIN"
+                         Background="White"
+                         Foreground="Black"
+                         BorderBrush="#FF0078D7"
+                         BorderThickness="0,0,0,2"
+                         FontSize="18"
+                         FontFamily="Segoe WP"
+                         Padding="8,10,8,10"
+                         Margin="0,0,0,20"
+                         InputScope="Number"/>
+
+                <!-- Пароль -->
+                <TextBlock Text="Пароль"
+                           FontSize="14"
+                           FontFamily="Segoe WP"
+                           Foreground="#AAFFFFFF"
+                           Margin="0,0,0,4"/>
+                <PasswordBox x:Name="PasswordBox"
+                             PlaceholderText="Введите пароль"
+                             Background="White"
+                             Foreground="Black"
+                             BorderBrush="#FF0078D7"
+                             BorderThickness="0,0,0,2"
+                             FontSize="18"
+                             FontFamily="Segoe WP"
+                             Padding="8,10,8,10"
+                             Margin="0,0,0,20"/>
+
+                <!-- Статус -->
+                <TextBlock Text="Статус при входе"
+                           FontSize="14"
+                           FontFamily="Segoe WP"
+                           Foreground="#AAFFFFFF"
+                           Margin="0,0,0,4"/>
+                <ComboBox x:Name="StatusComboBox"
+                          SelectedIndex="0"
+                          Background="#FF1A1A2E"
+                          Foreground="White"
+                          BorderBrush="#FF0078D7"
+                          BorderThickness="0,0,0,2"
+                          FontSize="16"
+                          FontFamily="Segoe WP"
+                          HorizontalAlignment="Stretch"
+                          Margin="0,0,0,8">
+                    <ComboBoxItem Content="Онлайн"/>
+                    <ComboBoxItem Content="Готов поболтать"/>
+                    <ComboBoxItem Content="Отошел"/>
+                    <ComboBoxItem Content="Недоступен"/>
+                    <ComboBoxItem Content="Занят"/>
+                    <ComboBoxItem Content="Не беспокоить"/>
+                    <ComboBoxItem Content="Дома"/>
+                    <ComboBoxItem Content="Работа"/>
+                    <ComboBoxItem Content="Кушаю"/>
+                    <ComboBoxItem Content="Депрессия"/>
+                    <ComboBoxItem Content="Злой"/>
+                    <ComboBoxItem Content="Невидимый"/>
+                    <ComboBoxItem Content="Невидимый для всех"/>
+                </ComboBox>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Оверлей загрузки -->
+        <Border x:Name="LoadingOverlay"
+                Grid.Row="0"
+                Background="#CC000000"
+                Visibility="Collapsed">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                <ProgressRing IsActive="True" Width="48" Height="48" Foreground="#FF0078D7"/>
+                <TextBlock x:Name="StatusTextBlock"
+                           Text="Подключение..."
+                           Foreground="White"
+                           FontSize="16"
+                           FontFamily="Segoe WP"
+                           HorizontalAlignment="Center"
+                           Margin="0,14,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>
+

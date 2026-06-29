@@ -48,6 +48,7 @@ namespace kicq4WP
             if (string.IsNullOrWhiteSpace(login) || string.IsNullOrWhiteSpace(password))
             {
                 await ShowMessageDialog("Заполните все поля: UIN и пароль.");
+                LoadingOverlay.Visibility = Visibility.Collapsed;
                 return;
             }
 
@@ -56,37 +57,48 @@ namespace kicq4WP
             _oscarProtocol.StatusUpdater = UpdateStatusText;
             Debug.WriteLine($"OscarProtocol instance created with UIN: {login}");
 
-            bool success = await _oscarProtocol.AuthenticateAsync(statusCode);
-            
-            if (success)
+            try
             {
+                // AuthenticateAsync внутри уже делает BOS redirect и подключается к BOS
+                bool success = await _oscarProtocol.AuthenticateAsync(statusCode);
+                if (!success)
+                {
+                    LoadingOverlay.Visibility = Visibility.Collapsed;
+                    await ShowMessageDialog("Ошибка авторизации. Проверьте логин и пароль.");
+                    return;
+                }
                 Debug.WriteLine("Authentication succeeded");
+
+                // Полная инициализация сессии
+                await _oscarProtocol.InitializeOscarSessionAsync(statusCode);
+
+                ((App)Application.Current).Oscar = _oscarProtocol;
+
+                // Запускаем ReconnectService
+                var reconnect = new ReconnectService(_oscarProtocol.UIN, password, statusCode, this.Dispatcher);
+                reconnect.OnDisconnected += () =>
+                reconnect.Reconnected += (newOscar) =>
+                {
+                    ((App)Application.Current).Oscar = newOscar;
+                };
+                ((App)Application.Current).ReconnectService = reconnect;
+                reconnect.Start(_oscarProtocol);
 
                 SettingsManager.SaveSetting("Login", login);
                 SettingsManager.SaveSetting("Password", password);
 
-                try
-                {
-                    await _oscarProtocol.SendSetStatusAsync(statusCode);
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
-                    // Навигация только если инициализация прошла успешно
-                    Frame.Navigate(typeof(MainPage), _oscarProtocol);
-                }
-                catch (TimeoutException)
-                {
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
-                    await ShowMessageDialog("Сервер не ответил вовремя или у вас проблемы с интернетом. Повторите попытку позже.");
-                }
-                catch (Exception ex)
-                {
-                    LoadingOverlay.Visibility = Visibility.Collapsed;
-                    await ShowMessageDialog("Ошибка при инициализации сессии: " + ex.Message);
-                }
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                Frame.Navigate(typeof(MainPage), _oscarProtocol);
             }
-            else
+            catch (TimeoutException)
             {
                 LoadingOverlay.Visibility = Visibility.Collapsed;
-                await ShowMessageDialog("Ошибка авторизации. Проверьте логин и пароль.");
+                await ShowMessageDialog("Сервер не ответил вовремя. Повторите попытку позже.");
+            }
+            catch (Exception ex)
+            {
+                LoadingOverlay.Visibility = Visibility.Collapsed;
+                await ShowMessageDialog("Ошибка: " + ex.Message);
             }
         }
 
@@ -133,7 +145,7 @@ namespace kicq4WP
 
         private async void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+            await ShowErrorDialog("В разработке");
         }
 
         private async void HelpButton_Click(object sender, RoutedEventArgs e)
@@ -143,12 +155,12 @@ namespace kicq4WP
 
         private async void ExitButton_Click(object sender, RoutedEventArgs e)
         {
-            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+            Application.Current.Exit();
         }
 
         private async void RegButton_Click(object sender, RoutedEventArgs e)
         {
-            await ShowErrorDialog("К сожалению зарегистрироваться в kicq через приложение пока что невозможно, есть два способа зарегистрировать uin, инструкция регистрации есть на сайте: abrbus.ru/kicq.htm");
+            await ShowErrorDialog("К сожалению зарегистрироваться в kicq через приложение пока что невозможно, инструкция регистрации есть на сайте: abrbus.ru/kicq.htm");
         }
 
         private void CommandBar_Opened(object sender, object e)

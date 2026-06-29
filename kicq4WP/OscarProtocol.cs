@@ -1,12 +1,10 @@
 ﻿// Note: this implementation is only compatible with kicq server (kicq.ru or 195.66.114.37) use the file AT YOUR OWN RISK!
 
-using kicq4WP.OscarParts.Snacs;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text;
 using System.Threading;
@@ -17,7 +15,6 @@ using Windows.Security.Cryptography;
 using Windows.Security.Cryptography.Core;
 using Windows.Storage.Streams;
 using Windows.UI.Popups;
-using kicq4WP;
 using System.Collections.ObjectModel;
 using Windows.UI.Core;
 
@@ -34,13 +31,12 @@ namespace kicq4WP
         private ushort _flapSequenceNumber = 0;
         private readonly SemaphoreSlim _readLock = new SemaphoreSlim(1, 1);
         // SNAC service handlers
-        private LocationService _locationService;
-        private BuddyListService _buddyListService;
-        private MessagingService _messagingService;
-        private PrivacyService _privacyService;
-        private SsiService _ssiService;
+        private CancellationTokenSource _receiveCts;
         private ObservableCollection<Contact> contacts;
+        private Dictionary<string, List<string[]>> _pendingMessages =
+        new Dictionary<string, List<string[]>>();
         public Action<string> StatusUpdater { get; set; }
+        public event Action<string, string> IncomingMessage;
 
         private ushort _snacRequestId = 1;
 
@@ -57,15 +53,7 @@ namespace kicq4WP
     0x0015, // ICQ-specific extensions
     0x0017  // Authorization/registration
 };
-        private void InitializeServiceHandlers()
-        {
-            _locationService = new LocationService(this);
-            _buddyListService = new BuddyListService(this);
-            _messagingService = new MessagingService(this);
-            _privacyService = new PrivacyService(this);
-            _ssiService = new SsiService(this);
-        }
-
+        private Task _;
 
         public ushort GetNextRequestID()
         {
@@ -288,7 +276,7 @@ namespace kicq4WP
 
 
 
-        private async Task<bool> SendLoginWithChallenge(byte[] challenge) // TODO: безопасный логин
+        private async Task<bool> SendLoginWithChallenge(byte[] challenge) //(нерабочий) TODO: безопасный логин
         {
             try
             {
@@ -418,6 +406,7 @@ namespace kicq4WP
         {
             try
             {
+                if (data == null) data = new byte[0];
                 _flapSequenceNumber++;
 
                 byte[] flapHeader = new byte[6];
@@ -571,26 +560,27 @@ namespace kicq4WP
             {
                 uint requestId = GetNextRequestID();
 
-                // Указываем используемые SNAC фемилии
+                // Точно по дампу из документации
                 ushort[][] families = new ushort[][]
                 {
-            new ushort[] { 0x01, 0x0003, 0x0110, 0x0001 }, // Generic
-            new ushort[] { 0x02, 0x0001, 0x0110, 0x0001 }, // Location
-            new ushort[] { 0x03, 0x0001, 0x0110, 0x0001 }, // Buddy list
-            new ushort[] { 0x04, 0x0001, 0x0110, 0x0001 }, // Messaging
-            new ushort[] { 0x06, 0x0001, 0x0110, 0x0001 }, // BOS
-            new ushort[] { 0x09, 0x0001, 0x0110, 0x0001 }, // Alerts
-            new ushort[] { 0x0A, 0x0001, 0x0110, 0x0001 }, // ICBM
-            new ushort[] { 0x13, 0x0004, 0x0110, 0x0001 }, // SSI
-            new ushort[] { 0x15, 0x0001, 0x0110, 0x0001 }, // Xtraz
+            new ushort[] { 0x0001, 0x0003, 0x0110, 0x047B }, // Generic
+            new ushort[] { 0x0013, 0x0002, 0x0110, 0x047B }, // SSI
+            new ushort[] { 0x0002, 0x0001, 0x0101, 0x047B }, // Location
+            new ushort[] { 0x0003, 0x0001, 0x0110, 0x047B }, // Buddy list
+            new ushort[] { 0x0015, 0x0001, 0x0110, 0x047B }, // ICQ extensions
+            new ushort[] { 0x0004, 0x0001, 0x0110, 0x047B }, // Messaging
+            new ushort[] { 0x0006, 0x0001, 0x0110, 0x047B }, // BOS
+            new ushort[] { 0x0009, 0x0001, 0x0110, 0x047B }, // Privacy
+            new ushort[] { 0x000A, 0x0001, 0x0110, 0x047B }, // Search
+            new ushort[] { 0x000B, 0x0001, 0x0110, 0x047B }, // Stats
                 };
 
                 foreach (var fam in families)
                 {
-                    writer.Write(SwapUInt16(fam[0])); // Family ID
-                    writer.Write(SwapUInt16(fam[1])); // Version
-                    writer.Write(SwapUInt16(fam[2])); // Tool ID
-                    writer.Write(SwapUInt16(fam[3])); // Tool version
+                    writer.Write(SwapUInt16(fam[0]));
+                    writer.Write(SwapUInt16(fam[1]));
+                    writer.Write(SwapUInt16(fam[2]));
+                    writer.Write(SwapUInt16(fam[3]));
                 }
 
                 await SendSnacAsync(0x01, 0x02, 0x0000, requestId, ms.ToArray());
@@ -635,30 +625,26 @@ namespace kicq4WP
             await _readLock.WaitAsync();
             try
             {
-                // Read FLAP header (6 bytes)
                 uint headerRead = await _reader.LoadAsync(6);
                 if (headerRead < 6)
-                    throw new Exception("FLAP header too short");
+                    throw new Exception("Connection closed by remote host");
 
                 byte[] header = new byte[6];
                 _reader.ReadBytes(header);
 
-                // Parse header
                 var flap = FlapFrame.Parse(header);
                 if (flap == null || flap.StartMarker != 0x2A)
                     throw new Exception("Invalid FLAP header");
 
-                // Read FLAP data
                 uint dataRead = await _reader.LoadAsync(flap.DataLength);
                 if (dataRead < flap.DataLength)
-                    throw new Exception("FLAP data truncated");
+                    throw new Exception("Connection closed during data read");
 
                 flap.Data = new byte[flap.DataLength];
                 _reader.ReadBytes(flap.Data);
 
-                Debug.WriteLine($"[FLAP] Received: Channel=0x{flap.Channel:X2}, " +
-                               $"Seq={flap.Sequence}, Length={flap.DataLength}");
-
+                Debug.WriteLine("[FLAP] Received: Channel=0x" + flap.Channel.ToString("X2") +
+                                ", Seq=" + flap.Sequence + ", Length=" + flap.DataLength);
                 return flap;
             }
             finally
@@ -753,108 +739,164 @@ namespace kicq4WP
         public async Task InitializeOscarSessionAsync(uint statusCode)
         {
             Debug.WriteLine("[Init] Starting OSCAR session initialization...");
-
             try
             {
-                // Получаем SNAC 0x01/0x18 (версии)
-                SnacPacket response = await ReceiveSnacWithTimeout(0x0001, 0x0018, TimeSpan.FromSeconds(5));
+                var response = await ReceiveSnacWithTimeout(0x0001, 0x0018, TimeSpan.FromSeconds(5));
                 if (response == null)
                 {
-                    throw new TimeoutException("Timeout waiting for SNAC 0x01/0x18 (Service Versions Reply)");
-                    Debug.WriteLine("[Init ERROR] Timeout waiting for SNAC 0x01/0x18 (Service Versions Reply)");
+                    Debug.WriteLine("[Init ERROR] Timeout waiting for SNAC 0x01/0x18");
                     return;
                 }
+                Debug.WriteLine("[Init] Received SNAC 0x01/0x18");
 
-                Debug.WriteLine("[Init] Received SNAC 0x01/0x18 (Service Versions Reply)");
-
-                // здесь должны были быть снаки для настройки соединения (01,06-08), но попробуем без них
-
-                // 4. Устанавливаем статус (онлайн и т.д.)
-                StatusUpdater?.Invoke("Устанавливаем статус...");
-                await Task.Delay(300);
-                //await SetStatusAsync(statusCode);
-                //await Task.Delay(300);
-               // await SendClientReadyAsync();
-                await Task.Delay(300);
+                // Отправляем все запросы и получаем контакты
                 await InitServicesAsync();
-                await Task.Delay(300);
-                Debug.WriteLine("[Init] OSCAR session initialization complete");
+                await Task.Delay(200);
+
+                // SNAC(02,04) — capabilities
+                await SendClientCapabilitiesAsync();
+                await Task.Delay(200);
+
+                // SNAC(01,1E) — статус
+                await SendSetStatusAsync(statusCode);
+                await Task.Delay(200);
+
+                // SNAC(01,02) — ClientReady
+                await SendClientReadyAsync();
+                await Task.Delay(200);
+
+                // SNAC(13,07) — активация SSI (после ClientReady как в QIP)
+                await SendSnacAsync(0x13, 0x07, 0x0000, GetNextRequestID(), null);
+
+                Debug.WriteLine("[Init] Инициализация завершена, запускаем receive loop");
+
+                // Запускаем receive loop
+                Task.Run(() => ReceiveServerSnacsAsync());
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Init ERROR] Exception during OSCAR session init: {ex}");
+                Debug.WriteLine($"[Init ERROR] {ex}");
                 throw;
             }
         }
 
         private async Task InitServicesAsync()
         {
-            Debug.WriteLine("[InitServices] Начало настройки сервисов...");
+            Debug.WriteLine("[InitServices] Начало по дампу QIP...");
             StatusUpdater?.Invoke("Настраиваем сервисы...");
-            // запрашиваем инфу о себе SNAC(01,0E)
-            await Task.Delay(300);
+
+            // 1. SNAC(01,0E) — запрос своей инфо (без ожидания ответа здесь)
             await SendSnacAsync(0x01, 0x0E, 0x00, GetNextRequestID(), null);
-            var onlInfo = await ReceiveSnacWithTimeout(0x01, 0x0F, TimeSpan.FromSeconds(5));
 
-            if (onlInfo == null)
-            {
-                throw new TimeoutException("Timeout waiting online info 0x01, 0x0F");
-            }
+            // 2. SNAC(13,02) — SSI params с телом 000b 0002 000f
+            byte[] ssiParamBody = new byte[] { 0x00, 0x0b, 0x00, 0x02, 0x00, 0x0f };
+            await SendSnacAsync(0x13, 0x02, 0x00, GetNextRequestID(), ssiParamBody);
 
-            await Task.Delay(300);
-            await SendSnacAsync(0x13, 0x02, 0x00, GetNextRequestID(), null);
-            var srvParam = await ReceiveSnacWithTimeout(0x13, 0x03, TimeSpan.FromSeconds(5));
-
-            if (srvParam == null)
-            {
-                throw new TimeoutException("Timeout waiting srv parameters 0x13, 0x03");
-            }
-
-            await Task.Delay(300);
-            await SendSnacAsync(0x02, 0x02, 0x00, GetNextRequestID(), null);
-            var reqlimit = await ReceiveSnacWithTimeout(0x02, 0x03, TimeSpan.FromSeconds(5));
-
-            if (reqlimit == null)
-            {
-                throw new TimeoutException("Timeout waiting limitations/params 0x02, 0x03");
-            }
-
-            await Task.Delay(300);
-            await SendSnacAsync(0x03, 0x02, 0x00, GetNextRequestID(), null);
-            var reqlimit2 = await ReceiveSnacWithTimeout(0x03, 0x03, TimeSpan.FromSeconds(5));
-
-            if (reqlimit2 == null)
-            {
-                throw new TimeoutException("Timeout waiting 0x03, 0x03");
-            }
-
-            await Task.Delay(300);
-            await SendSnacAsync(0x04, 0x04, 0x00, GetNextRequestID(), null);
-            var paraminfo = await ReceiveSnacWithTimeout(0x04, 0x05, TimeSpan.FromSeconds(5));
-
-            if (paraminfo == null)
-            {
-                throw new TimeoutException("Timeout waiting 0x04, 0x05");
-            }
-
-            await Task.Delay(300);
-            await SendSnacAsync(0x09, 0x02, 0x00, GetNextRequestID(), null);
-            var srvParam2 = await ReceiveSnacWithTimeout(0x09, 0x03, TimeSpan.FromSeconds(5));
-
-            if (srvParam2 == null)
-            {
-                throw new TimeoutException("Timeout waiting 0x09, 0x03");
-            }
-
-           /* await Task.Delay(300);
+            // 3. SNAC(13,04) — запрос контактов (ответ придёт позже)
             await SendSnacAsync(0x13, 0x04, 0x00, GetNextRequestID(), null);
-            var reqcl = await ReceiveSnacWithTimeout(0x13, 0x06, TimeSpan.FromSeconds(5));
 
-            if (reqcl == null)
+            // 4. SNAC(02,02) — location limits
+            await SendSnacAsync(0x02, 0x02, 0x00, GetNextRequestID(), null);
+
+            // 5. SNAC(03,02) — BLM limits с телом 0005 0002 0003
+            byte[] blmParamBody = new byte[] { 0x00, 0x05, 0x00, 0x02, 0x00, 0x03 };
+            await SendSnacAsync(0x03, 0x02, 0x00, GetNextRequestID(), blmParamBody);
+
+            // 6. SNAC(04,04) — ICBM params
+            await SendSnacAsync(0x04, 0x04, 0x00, GetNextRequestID(), null);
+
+            // 7. SNAC(09,02) — privacy limits
+            await SendSnacAsync(0x09, 0x02, 0x00, GetNextRequestID(), null);
+
+            Debug.WriteLine("[InitServices] Все запросы отправлены, ждём ответы...");
+
+            // Теперь ждём ответы — пропускаем всё лишнее пока не получим 13,06
+            var contacts = new ObservableCollection<Contact>();
+            var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+
+            while (DateTime.UtcNow < deadline)
             {
-                throw new TimeoutException("Timeout waiting 0x13, 0x03");
-            } */
+                var flap = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(5));
+                if (flap == null || flap.Channel != 0x02 || flap.Data.Length < 10) continue;
+
+                var snac = SnacPacket.Parse(flap.Data);
+                if (snac == null) continue;
+
+                Debug.WriteLine($"[InitServices] Получен SNAC({snac.Family:X2},{snac.Subtype:X2})");
+
+                if (snac.Family == 0x13 && snac.Subtype == 0x06)
+                {
+                    ParseContactListPacket(snac.Data, contacts);
+                    this.contacts = contacts;
+                    Debug.WriteLine($"[InitServices] Получили контакты: {contacts.Count}");
+
+                    if (!SnacFlags.HasMoreData(snac.Flags))
+                        break;
+                }
+                // остальные пакеты (01,0F / 13,03 / 02,03 / 03,03 / 04,05 / 09,03) просто пропускаем
+            }
+
+            await ContactStorage.SaveContactsToFileAsync(_uin, contacts);
+            Debug.WriteLine("[InitServices] Готово.");
         }
+
+        private async Task SendRateLimitsAckAsync(byte[] data)
+        {
+            // SNAC(01,07) содержит: ushort classCount, затем для каждого класса ushort classId + много данных
+            // Нам нужно извлечь classId каждого класса и подтвердить их через SNAC(01,08)
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
+            {
+                try
+                {
+                    int offset = 0;
+                    if (offset + 2 > data.Length) return;
+                    ushort classCount = ReadU16(data, ref offset);
+                    Debug.WriteLine($"[RateLimitsAck] classCount={classCount}");
+
+                    for (int i = 0; i < classCount; i++)
+                    {
+                        if (offset + 2 > data.Length) break;
+                        ushort classId = ReadU16(data, ref offset);
+                        writer.Write(SwapUInt16(classId));
+
+                        // Каждый класс содержит ещё 33 байта данных (window size, clear/alert/limit/disconnect/current level + flags)
+                        offset += 33;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[RateLimitsAck ERROR] {ex.Message}");
+                    return;
+                }
+
+                byte[] payload = ms.ToArray();
+                if (payload.Length > 0)
+                {
+                    await SendSnacAsync(0x01, 0x08, 0x00, GetNextRequestID(), payload);
+                    Debug.WriteLine($"[RateLimitsAck] Sent SNAC(01,08) with {payload.Length / 2} class IDs");
+                }
+            }
+        }
+
+        private async Task SendIcbmParametersAsync()
+        {
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
+            {
+                writer.Write(SwapUInt16(0x0000)); // channel
+                writer.Write(SwapUInt32(0x00000003)); // flags: отправка + получение
+                writer.Write(SwapUInt16(0x1F40)); // max message snac size
+                writer.Write(SwapUInt16(0x03E7)); // max sender warning level
+                writer.Write(SwapUInt16(0x03E7)); // max receiver warning level
+                writer.Write(SwapUInt32(0x00000000)); // min message interval (ms)
+
+                await SendSnacAsync(0x04, 0x02, 0x00, GetNextRequestID(), ms.ToArray());
+                Debug.WriteLine("[ICBM] Sent SNAC(04,02) — ICBM parameters");
+            }
+        }
+
+
 
         private async Task ClientIdentAsync()
         {
@@ -863,7 +905,7 @@ namespace kicq4WP
 
         private byte[] GetMyCapabilities()
         {
-            // ICQ стандартные capabilities: например, поддержка UTF-8, file transfers и т.д.
+            // ICQ capabilities: например, поддержка UTF-8, file transfers и т.д.
             return new byte[]
             {
         0x09, 0x46, 0x13, 0x4C, 0x4C, 0x7F, 0x11, 0xD1,
@@ -1016,51 +1058,16 @@ namespace kicq4WP
 
         public async Task<ObservableCollection<Contact>> GetContactsAsync(uint statusCode)
         {
-            var contacts = new ObservableCollection<Contact>();
-            contacts.Clear();
-            StatusUpdater?.Invoke("Получаем список контактов...");
-            Debug.WriteLine("[GetContacts] Requesting contact list...");
-            await SendSnacAsync(0x13, 0x04, 0x00, GetNextRequestID(), null);
-
-            try
+            // contacts уже заполнен в InitServicesAsync
+            if (this.contacts != null && this.contacts.Count > 0)
             {
-                while (true)
-                {
-                    var response = await ReceiveSnacWithTimeout(0x13, 0x06, TimeSpan.FromSeconds(5));
-                    if (response == null) break;
-
-                    Debug.WriteLine($"[GetContacts] Received SNAC(13,06), length: {response.Data.Length}");
-                    ParseContactListPacket(response.Data, contacts);
-
-                    // Проверяем флаг "more data" в SNAC заголовке (бит 0x01)
-                    if (!SnacFlags.HasMoreData(response.Flags))
-                        break;
-
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[GetContacts ERROR] {ex.Message}");
+                Debug.WriteLine($"[GetContacts] Returning cached contacts: {this.contacts.Count}");
+                return this.contacts;
             }
 
-            Debug.WriteLine($"[GetContacts] Total contacts received: {contacts.Count}");
-            await SendSnacAsync(0x13, 0x07, 0x0000, GetNextRequestID(), null);
-            await Task.Delay(300);
-            await SendSetStatusAsync(statusCode);
-            await Task.Delay(300);
-            await SendClientCapabilitiesAsync();
-            await Task.Delay(300);
-            await SendClientReadyAsync();
-            await ContactStorage.SaveContactsToFileAsync(_uin, contacts);
-            SnacPacket snac = await ReceiveSnacWithTimeout(0x03, 0x0B, TimeSpan.FromSeconds(5));
-            if (snac.Family == 0x0003 && snac.Subtype == 0x000B)
-            {
-                await HandleUserOnlineAsync(snac.Data);
-            }
-
-            return contacts;
-
-
+            // Если по какой-то причине пусто — возвращаем пустой список
+            Debug.WriteLine("[GetContacts] contacts is empty");
+            return new ObservableCollection<Contact>();
         }
 
         public async Task SendClientCapabilitiesAsync()
@@ -1234,29 +1241,34 @@ namespace kicq4WP
             {
                 uint requestId = GetNextRequestID();
 
-                // TLV 0x06 - статус
-                writer.Write((ushort)0x0006); // TLV.Type
-                writer.Write((ushort)0x0004); // TLV.Length
-                writer.Write(SwapUInt32(statusCode)); // Статус: например 0x00000000 = online
+                // TLV(0x06) — статус
+                writer.Write(SwapUInt16(0x0006));
+                writer.Write(SwapUInt16(0x0004));
+                writer.Write(SwapUInt32(statusCode));
 
-                // TLV 0x0C - DC info
-                writer.Write((ushort)0x000C);
-                writer.Write((ushort)0x0025);
-                writer.Write(SwapUInt32(0));             // internal IP
-                writer.Write(SwapUInt32(0));             // port
-                writer.Write((byte)0x04);                // DC type (0x04 = indirect connection)
-                writer.Write(SwapUInt16(0x0000));        // protocol version
-                writer.Write(SwapUInt32(0x12345678));    // auth cookie
-                writer.Write(SwapUInt32(0));             // web port
-                writer.Write(SwapUInt32(0x00000003));    // client features (basic flags)
+                // TLV(0x08) — unknown, присутствует в дампах
+                writer.Write(SwapUInt16(0x0008));
+                writer.Write(SwapUInt16(0x0002));
+                writer.Write(SwapUInt16(0x0000));
+
+                // TLV(0x0C) — DC info
+                writer.Write(SwapUInt16(0x000C));
+                writer.Write(SwapUInt16(0x0025));
+                writer.Write(SwapUInt32(0x00000000)); // internal IP
+                writer.Write(SwapUInt32(0x00000000)); // DC tcp port
+                writer.Write((byte)0x04);             // DC type
+                writer.Write(SwapUInt16(0x0004));     // DC protocol version = 4 (ICQ)
+                writer.Write(SwapUInt32(0x00000000)); // DC auth cookie
+                writer.Write(SwapUInt32(0x00000000)); // web front port
+                writer.Write(SwapUInt32(0x00000003)); // client futures
                 uint unixTime = (uint)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
-                writer.Write(SwapUInt32(unixTime)); // last info update
-                writer.Write(SwapUInt32(unixTime)); // ext info update
-                writer.Write(SwapUInt32(unixTime)); // ext status update
-                writer.Write((ushort)0x0000);       // unknown
+                writer.Write(SwapUInt32(unixTime));   // last info update time
+                writer.Write(SwapUInt32(unixTime));   // last ext info update time
+                writer.Write(SwapUInt32(unixTime));   // last ext status update time
+                writer.Write(SwapUInt16(0x0000));     // unknown
 
                 await SendSnacAsync(0x01, 0x1E, 0x0000, requestId, ms.ToArray());
-                Debug.WriteLine("[SetStatus] Sent SNAC(01,1E) with status " + statusCode.ToString("X8"));
+                Debug.WriteLine("[SetStatus] Sent SNAC(01,1E) status=0x" + statusCode.ToString("X8"));
             }
         }
 
@@ -1429,8 +1441,97 @@ namespace kicq4WP
             return result;
         }
 
+        public async Task SendIcbmAsync(string toUin, string text)
+        {
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
+            {
+                uint uptime = (uint)Environment.TickCount;
+                uint rand = (uint)new Random().Next();
+                writer.Write(SwapUInt32(uptime));
+                writer.Write(SwapUInt32(rand));
 
-        private async Task<bool> WaitForRedirectOrBosAsync(uint statusCode)
+                writer.Write(SwapUInt16(0x0001)); // channel 1
+
+                byte[] uinBytes = Encoding.UTF8.GetBytes(toUin);
+                writer.Write((byte)uinBytes.Length);
+                writer.Write(uinBytes);
+
+                // UTF-16 Big Endian
+                byte[] msgBytes = Encoding.BigEndianUnicode.GetBytes(text);
+
+                // fragment 0x05: capabilities (text=1)
+                byte[] caps = new byte[] { 0x05, 0x01, 0x00, 0x01, 0x01 };
+
+                // fragment 0x01: charset 0x0002 = UTF-16 BE
+                byte[] textFrag;
+                using (var tfms = new MemoryStream())
+                using (var tfw = new BinaryWriter(tfms))
+                {
+                    tfw.Write((byte)0x01);
+                    tfw.Write((byte)0x01);
+                    ushort textDataLen = (ushort)(4 + msgBytes.Length);
+                    tfw.Write(SwapUInt16(textDataLen));
+                    tfw.Write(SwapUInt16(0x0002)); // charset UTF-16 BE
+                    tfw.Write(SwapUInt16(0xFFFF)); // language
+                    tfw.Write(msgBytes);
+                    textFrag = tfms.ToArray();
+                }
+
+                byte[] msgData;
+                using (var mdms = new MemoryStream())
+                {
+                    mdms.Write(caps, 0, caps.Length);
+                    mdms.Write(textFrag, 0, textFrag.Length);
+                    msgData = mdms.ToArray();
+                }
+
+                writer.Write(SwapUInt16(0x0002));
+                writer.Write(SwapUInt16((ushort)msgData.Length));
+                writer.Write(msgData);
+
+                writer.Write(SwapUInt16(0x0006));
+                writer.Write(SwapUInt16(0x0000));
+
+                await SendSnacAsync(0x04, 0x06, 0x0000, GetNextRequestID(), ms.ToArray());
+                Debug.WriteLine($"[ICBM] Sent to {toUin}: {text}");
+            }
+        }
+
+
+        private static string DecodeWin1251(byte[] data, int offset, int length)
+{
+    // Таблица символов windows-1251 начиная с 0x80
+    string high = "\u0402\u0403\u201A\u0453\u201E\u2026\u2020\u2021" +
+                  "\u20AC\u2030\u0409\u2039\u040A\u040C\u040B\u040F" +
+                  "\u0452\u2018\u2019\u201C\u201D\u2022\u2013\u2014" +
+                  "\uFFFD\u2122\u0459\u203A\u045A\u045C\u045B\u045F" +
+                  "\u00A0\u040E\u045E\u0408\u00A4\u0490\u00A6\u00A7" +
+                  "\u0401\u00A9\u0404\u00AB\u00AC\u00AD\u00AE\u0407" +
+                  "\u00B0\u00B1\u0406\u0456\u0491\u00B5\u00B6\u00B7" +
+                  "\u0451\u2116\u0454\u00BB\u0458\u0405\u0455\u0457" +
+                  "\u0410\u0411\u0412\u0413\u0414\u0415\u0416\u0417" +
+                  "\u0418\u0419\u041A\u041B\u041C\u041D\u041E\u041F" +
+                  "\u0420\u0421\u0422\u0423\u0424\u0425\u0426\u0427" +
+                  "\u0428\u0429\u042A\u042B\u042C\u042D\u042E\u042F" +
+                  "\u0430\u0431\u0432\u0433\u0434\u0435\u0436\u0437" +
+                  "\u0438\u0439\u043A\u043B\u043C\u043D\u043E\u043F" +
+                  "\u0440\u0441\u0442\u0443\u0444\u0445\u0446\u0447" +
+                  "\u0448\u0449\u044A\u044B\u044C\u044D\u044E\u044F";
+
+    var sb = new System.Text.StringBuilder(length);
+    for (int i = 0; i < length; i++)
+    {
+        byte b = data[offset + i];
+        if (b < 0x80)
+            sb.Append((char)b);
+        else
+            sb.Append(high[b - 0x80]);
+    }
+    return sb.ToString();
+}
+
+        public async Task<bool> WaitForRedirectOrBosAsync(uint statusCode)
         {
             StatusUpdater?.Invoke("Ждем redirect...");
             Debug.WriteLine("[Login] Waiting for redirect or BOS connect...");
@@ -1519,6 +1620,172 @@ namespace kicq4WP
             }
         }
 
+        private void HandleIncomingIcbm(byte[] data)
+        {
+            try
+            {
+                int offset = 0;
+
+                // skip 8 bytes cookie
+                offset += 8;
+
+                if (offset + 2 > data.Length) return;
+                ushort channel = ReadU16(data, ref offset);
+
+                if (offset + 1 > data.Length) return;
+                byte uinLen = data[offset++];
+                if (offset + uinLen > data.Length) return;
+                string senderUin = Encoding.UTF8.GetString(data, offset, uinLen);
+                offset += uinLen;
+
+                // warning level
+                if (offset + 2 > data.Length) return;
+                offset += 2;
+
+                // пропускаем фиксированные TLV
+                if (offset + 2 > data.Length) return;
+                ushort tlvCount = ReadU16(data, ref offset);
+                for (int i = 0; i < tlvCount && offset + 4 <= data.Length; i++)
+                {
+                    int peekOffset = offset + 2;
+                    ushort tlvLen = ReadU16(data, ref peekOffset);
+                    offset += 4 + tlvLen;
+                }
+
+                string text = null;
+
+                if (channel == 0x0001)
+                {
+                    while (offset + 4 <= data.Length)
+                    {
+                        ushort tlvType = ReadU16(data, ref offset);
+                        ushort tlvLen = ReadU16(data, ref offset);
+                        int tlvEnd = offset + tlvLen;
+                        if (tlvEnd > data.Length) break;
+
+                        if (tlvType == 0x0002)
+                        {
+                            int moff = offset;
+
+                            // fragment 0x05 — capabilities: пропускаем
+                            if (moff + 4 > tlvEnd) { offset = tlvEnd; break; }
+                            if (data[moff] == 0x05)
+                            {
+                                moff += 2; // id + version
+                                ushort capLen = (ushort)((data[moff] << 8) | data[moff + 1]);
+                                moff += 2 + capLen;
+                            }
+
+                            // fragment 0x01 — text
+                            if (moff + 4 <= tlvEnd && data[moff] == 0x01)
+                            {
+                                moff += 2; // id + version
+                                ushort textBlockLen = (ushort)((data[moff] << 8) | data[moff + 1]);
+                                moff += 2;
+
+                                if (textBlockLen >= 4 && moff + textBlockLen <= tlvEnd)
+                                {
+                                    // читаем charset
+                                    ushort charset = (ushort)((data[moff] << 8) | data[moff + 1]);
+                                    moff += 4; // charset + lang
+
+                                    int textLen = textBlockLen - 4;
+                                    if (textLen > 0)
+                                    {
+                                        // charset 0x0002 = UTF-16 BE, иначе Windows-1251
+                                        if (charset == 0x0002)
+                                            text = Encoding.BigEndianUnicode.GetString(data, moff, textLen);
+                                        else
+                                            text = charset == 0x0002
+    ? Encoding.BigEndianUnicode.GetString(data, moff, textLen)
+    : DecodeWin1251(data, moff, textLen);
+                                    }
+                                }
+                            }
+                            offset = tlvEnd;
+                            break;
+                        }
+                        else
+                        {
+                            offset = tlvEnd;
+                        }
+                    }
+                }
+                else if (channel == 0x0004)
+                {
+                    while (offset + 4 <= data.Length)
+                    {
+                        ushort tlvType = ReadU16(data, ref offset);
+                        ushort tlvLen = ReadU16(data, ref offset);
+                        int tlvEnd = offset + tlvLen;
+                        if (tlvEnd > data.Length) break;
+
+                        if (tlvType == 0x0005 && tlvLen > 8)
+                        {
+                            int moff = offset;
+                            moff += 4; // sender uin LE
+                            byte msgType = data[moff++];
+                            byte msgFlags = data[moff++];
+                            // длина в LE
+                            ushort msgLen = (ushort)(data[moff] | (data[moff + 1] << 8));
+                            moff += 2;
+
+                            if (msgLen > 0 && moff + msgLen <= tlvEnd)
+                            {
+                                // channel 4 всегда Windows-1251, null-terminated
+                                int len = msgLen;
+                                if (len > 0 && data[moff + len - 1] == 0x00) len--;
+                                if (len > 0)
+                                    text = DecodeWin1251(data, moff, len);
+                            }
+                            offset = tlvEnd;
+                            break;
+                        }
+                        else
+                        {
+                            offset = tlvEnd;
+                        }
+                    }
+                }
+
+                if (text != null)
+                {
+                    // Сохраняем в очередь
+                    if (!_pendingMessages.ContainsKey(senderUin))
+                        _pendingMessages[senderUin] = new List<string[]>();
+                    _pendingMessages[senderUin].Add(new string[]
+                    {
+        text,
+        DateTime.Now.ToString("HH:mm")
+                    });
+
+                    IncomingMessage?.Invoke(senderUin, text);
+
+                    string displayName = senderUin;
+                    if (contacts != null)
+                    {
+                        var c = contacts.FirstOrDefault(x => x.Uin == senderUin);
+                        if (c != null) displayName = c.Name;
+                    }
+                    var ignored = NotificationService.Instance.OnMessageReceived(
+                        senderUin, displayName, text, _dispatcher);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[HandleIncomingIcbm ERROR] {ex}");
+            }
+        }
+
+        public List<string[]> GetAndClearPending(string uin)
+        {
+            if (!_pendingMessages.ContainsKey(uin))
+                return new List<string[]>();
+            var msgs = _pendingMessages[uin];
+            _pendingMessages[uin] = new List<string[]>();
+            return msgs;
+        }
+
         public async Task SetStatusAsync(uint statusCode)
         {
             using (var ms = new MemoryStream())
@@ -1579,23 +1846,91 @@ namespace kicq4WP
             // Handle specific SNAC types
             switch (snac.Family)
             {
-                case 0x0001: // Generic service
+                case 0x0001:
                     switch (snac.Subtype)
                     {
-                        case 0x0003: // Service family list
-                            Debug.WriteLine("[SNAC] Received service families list");
+                        case 0x0003:
+                            Debug.WriteLine("[SNAC] Service families list");
                             var families = ParseSupportedFamilies(snac.Data);
                             await HandleServiceFamilies(families);
                             break;
-
-                        case 0x0018: // Service versions reply
-                            Debug.WriteLine("[SNAC] Received service versions reply");
+                        case 0x0018:
+                            Debug.WriteLine("[SNAC] Service versions reply");
                             await HandleServiceVersionsResponse(snac.Data);
                             break;
                     }
                     break;
 
-                    // Add handlers for other families as needed
+                case 0x0003:
+                    switch (snac.Subtype)
+                    {
+                        case 0x000B:
+                            Debug.WriteLine("[SNAC] User online");
+                            await HandleUserOnlineAsync(snac.Data);
+                            break;
+                        case 0x000C:
+                            Debug.WriteLine("[SNAC] User offline");
+                            await HandleUserOfflineAsync(snac.Data);
+                            break;
+                    }
+                    break;
+
+                case 0x0004: // ICBM
+                    switch (snac.Subtype)
+                    {
+                        case 0x0007:
+                            HandleIncomingIcbm(snac.Data);
+                            break;
+                    }
+                    break;
+            }
+        }
+
+
+
+        private async Task HandleUserOfflineAsync(byte[] data)
+        {
+            try
+            {
+                int offset = 0;
+                while (offset < data.Length)
+                {
+                    if (offset + 1 > data.Length) break;
+                    byte uinLen = data[offset++];
+                    if (uinLen == 0 || offset + uinLen > data.Length) break;
+
+                    string uin = Encoding.UTF8.GetString(data, offset, uinLen);
+                    offset += uinLen;
+
+                    // пропускаем warning level + tlv count + TLVs
+                    if (offset + 2 > data.Length) break;
+                    offset += 2; // warning level
+
+                    if (offset + 2 > data.Length) break;
+                    ushort tlvCount = ReadU16(data, ref offset);
+                    for (int i = 0; i < tlvCount && offset + 4 <= data.Length; i++)
+                    {
+                        ushort tlvLen = ReadU16(data, ref new int[] { offset + 2 }[0]);
+                        offset += 4 + tlvLen;
+                    }
+
+                    Debug.WriteLine($"[HandleUserOffline] {uin} went offline");
+
+                    await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                    {
+                        if (contacts == null) return;
+                        var contact = contacts.FirstOrDefault(c => c.Uin == uin);
+                        if (contact != null)
+                        {
+                            contact.StatusIcon = "/Assets/statuses/offline.png";
+                            contact.IsNewOnline = false;
+                        }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[HandleUserOffline ERROR] {ex}");
             }
         }
 
@@ -1651,29 +1986,31 @@ namespace kicq4WP
         {
             try
             {
-                Debug.WriteLine("[OscarProtocol] Sending logout SNAC (0x01/0x04)");
+                if (_reader != null)
+                {
+                    _reader.DetachStream();
+                    _reader.Dispose();
+                    _reader = null;
+                }
 
-                // Отправляем SNAC (Family 0x01, Subtype 0x04) — logout
-                await SendFlapAsync(0x04, null);
-                await Task.Delay(200);
+                if (_writer != null)
+                {
+                    _writer.DetachStream();
+                    _writer.Dispose();
+                    _writer = null;
+                }
 
-                _writer?.DetachStream();
-                _writer?.Dispose();
-                _writer = null;
-
-                _reader?.DetachStream();
-                _reader?.Dispose();
-                _reader = null;
-
-                _socket?.Dispose();
-                _socket = null;
-
-                Debug.WriteLine("[OscarProtocol] Disconnected cleanly.");
+                if (_socket != null)
+                {
+                    _socket.Dispose();
+                    _socket = null;
+                }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine("[OscarProtocol] Disconnect failed: " + ex.Message);
+                Debug.WriteLine("Disconnect error: " + ex);
             }
+
         }
 
         private async Task HandleUserOnlineAsync(byte[] data)
@@ -1681,87 +2018,86 @@ namespace kicq4WP
             try
             {
                 int offset = 0;
-                while (offset + 2 <= data.Length)
-                {
-                    byte uinLen = data[offset++];
-                    if (offset + uinLen > data.Length) break;
 
+                while (offset < data.Length)
+                {
+                    // byte: uin string length
+                    if (offset + 1 > data.Length) break;
+                    byte uinLen = data[offset++];
+                    if (uinLen == 0 || offset + uinLen > data.Length) break;
+
+                    // string: uin
                     string uin = Encoding.UTF8.GetString(data, offset, uinLen);
                     offset += uinLen;
 
+                    // word: warning level (unused)
                     if (offset + 2 > data.Length) break;
-                    offset += 2; // warning level
-
-                    if (offset + 2 > data.Length) break;
-                    ushort tlvCount = BitConverter.ToUInt16(data, offset);
                     offset += 2;
 
-                    uint status = 0;
-                    int startOffset = offset;
+                    // word: number of TLVs
+                    if (offset + 2 > data.Length) break;
+                    ushort tlvCount = ReadU16(data, ref offset); // big-endian ReadU16
 
-                    for (int i = 0; i < tlvCount && offset + 4 <= data.Length;)
+                    uint status = 0xFFFFFFFF; // неизвестен пока не прочитаем TLV(06)
+
+                    for (int i = 0; i < tlvCount && offset + 4 <= data.Length; i++)
                     {
-                        ushort tlvType = BitConverter.ToUInt16(data, offset);
-                        ushort tlvLen = BitConverter.ToUInt16(data, offset + 2);
-                        offset += 4;
+                        ushort tlvType = ReadU16(data, ref offset);
+                        ushort tlvLen = ReadU16(data, ref offset);
 
-                        if (offset + tlvLen > data.Length) break;
+                        if (offset + tlvLen > data.Length)
+                        {
+                            Debug.WriteLine($"[HandleUserOnline] TLV 0x{tlvType:X4} выходит за пределы данных");
+                            break;
+                        }
 
                         if (tlvType == 0x0006 && tlvLen == 4)
                         {
-                            status = BitConverter.ToUInt32(data, offset);
+                            status = ReadU32(data, ref offset);
+                            Debug.WriteLine($"[HandleUserOnline] {uin} status=0x{status:X8}");
                         }
-
-                        offset += tlvLen;
-                        i++;
+                        else
+                        {
+                            offset += tlvLen; // пропускаем остальные TLV
+                        }
                     }
 
-                    Debug.WriteLine($"[UserOnline] {uin} is online, status=0x{status:X8}");
+                    Debug.WriteLine($"[HandleUserOnline] {uin} is online, status=0x{status:X8}");
+
+                    string iconPath = status == 0xFFFFFFFF
+                        ? "/Assets/statuses/online.png"
+                        : StatusIconHelper.GetIconForStatus(status);
 
                     await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                     {
-                        if (contacts == null)
-                        {
-                            Debug.WriteLine("[UserOnline] contacts == null, пропускаем обновление статуса.");
-                            return;
-                        }
-
+                        if (contacts == null) return;
                         var contact = contacts.FirstOrDefault(c => c.Uin == uin);
                         if (contact == null)
                         {
-                            Debug.WriteLine($"[UserOnline] Контакт с UIN {uin} не найден в списке.");
+                            Debug.WriteLine($"[HandleUserOnline] Контакт {uin} не найден");
                             return;
                         }
+                        contact.StatusIcon = iconPath;
+                        contact.IsNewOnline = true;
 
-                        if (contact != null)
-                        {
-                            contact.StatusIcon = StatusIconHelper.GetIconForStatus(status);
-                            contact.IsNewOnline = true;
-
-                            // Через 5 секунд убрать стрелочки
-                            Task.Delay(5000).ContinueWith(_ =>
-                            {
-                                _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
-                                {
-                                    contact.IsNewOnline = false;
-                                }).AsTask();
-                            });
-                        }
+                        Task.Delay(5000).ContinueWith(_ =>
+                            _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                                contact.IsNewOnline = false).AsTask());
                     });
-
-                    // offset может быть неправильным, если TLV плохо прочитан — на всякий случай пересчитываем
-                    offset = startOffset;
-                    for (int i = 0; i < tlvCount && offset + 4 <= data.Length; i++)
-                    {
-                        ushort tlvLen = BitConverter.ToUInt16(data, offset + 2);
-                        offset += 4 + tlvLen;
-                    }
                 }
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[HandleUserOnline ERROR] {ex}");
             }
+        }
+
+        private uint ReadU32(byte[] data, ref int offset)
+        {
+            uint val = (uint)((data[offset] << 24) | (data[offset + 1] << 16) |
+                              (data[offset + 2] << 8) | data[offset + 3]);
+            offset += 4;
+            return val;
         }
 
         public static class StatusIconHelper
@@ -1815,25 +2151,58 @@ namespace kicq4WP
 
         public async Task ReceiveServerSnacsAsync()
         {
-            Debug.WriteLine("[SnacReceiver] Starting server SNAC listener...");
+            Debug.WriteLine("[SnacReceiver] Starting...");
+            _receiveCts = new CancellationTokenSource();
+            Task.Run(() => KeepAliveLoopAsync(_receiveCts.Token));
 
             try
             {
-                while (true)
+                while (!_receiveCts.IsCancellationRequested)
                 {
-                    var flap = await ReceiveFlapWithTimeout(TimeSpan.FromSeconds(30));
-                    if (flap == null)
+                    var flap = await ReceiveFlapAsync(); // бросит исключение при обрыве
+                    if (flap == null) continue;
+                    if (flap.Channel == 0x05)
                     {
-                        Debug.WriteLine("[SnacReceiver] No FLAP received, continuing...");
+                        Debug.WriteLine("[SnacReceiver] Got keep alive");
                         continue;
                     }
-
                     await HandleFlapAsync(flap);
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[SnacReceiver ERROR] {ex.Message}");
+                Debug.WriteLine("[SnacReceiver] Connection lost: " + ex.Message);
+                _receiveCts.Cancel();
+                throw; //пробрасываем дальше в ReconnectService
+            }
+        }
+
+        private async Task KeepAliveLoopAsync(CancellationToken token)
+        {
+            try
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    await Task.Delay(60000, token);
+                    if (token.IsCancellationRequested) break;
+
+                    try
+                    {
+                        // FLAP channel 0x05, пустые данные
+                        await SendFlapAsync(0x05, new byte[0]);
+                        Debug.WriteLine("[KeepAlive] Sent");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[KeepAlive] Failed: " + ex.Message);
+                        break;
+                    }
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[KeepAlive ERROR] " + ex.Message);
             }
         }
 

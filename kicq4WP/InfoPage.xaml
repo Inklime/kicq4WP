@@ -23,7 +23,7 @@
 
         <!--Панель заголовка-->
         <StackPanel Grid.Row="0" Margin="19,0,0,0">
-            <TextBlock Text="KICQ" Style="{ThemeResource TitleTextBlockStyle}" Margin="0,12,0,0"/>
+            <TextBlock Text="kicq4WP" Style="{ThemeResource TitleTextBlockStyle}" Margin="0,12,0,0"/>
             <TextBlock Text="Справка" Margin="0,-6.5,0,26.5" Style="{ThemeResource HeaderTextBlockStyle}" CharacterSpacing="{ThemeResource PivotHeaderItemCharacterSpacing}"/>
         </StackPanel>
 
@@ -33,14 +33,14 @@
                        FontSize="25"
                        Foreground="White"
                        TextWrapping="Wrap"
-                       Text="kicq4WP — это современный клиент ICQ для устройств на базе Windows Phone 8.1, реализующий протокол OSCAR. Клиент позволяет удобно общаться в сети ICQ, поддерживая основные функции мессенджера и интерфейс в стиле Windows Phone." />
+                       Text="kicq4WP — это клиент ICQ для устройств на базе Windows Phone 8.1, реализующий протокол OSCAR. Клиент позволяет удобно общаться в сети ICQ, поддерживая основные функции мессенджера." />
         </ScrollViewer>
         <TextBlock x:Name="author"
        FontSize="20"
        Foreground="White"
        Margin="19,466.833,19,0"
        VerticalAlignment="Top"
-       Text="Создатель: inklime aka (Gregory)" Grid.Row="1" />
+       Text="Создатель: blackblur13 (AKA. inklime)" Grid.Row="1" />
         <!--TODO: Содержимое должно размещаться в следующей сетке-->
         <Grid Grid.Row="1" x:Name="ContentRoot" Margin="19,9.5,19,0">
             <!-- здесь можно разместить дополнительный контент -->

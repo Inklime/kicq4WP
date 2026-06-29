@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/2010/manifest" xmlns:m2="http://schemas.microsoft.com/appx/2013/manifest" xmlns:m3="http://schemas.microsoft.com/appx/2014/manifest" xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest">
-  <Identity Name="8cf5cb14-5ebe-4291-a5f6-e2e9b4888616" Publisher="CN=sonic" Version="1.0.0.1" />
-  <mp:PhoneIdentity PhoneProductId="8cf5cb14-5ebe-4291-a5f6-e2e9b4888616" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
+  <Identity Name="943be6ba-6935-43cb-9a3c-a8292fd4fadb" Publisher="CN=Gregory" Version="1.0.0.19" />
+  <mp:PhoneIdentity PhoneProductId="943be6ba-6935-43cb-9a3c-a8292fd4fadb" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
-    <DisplayName>kicq</DisplayName>
+    <DisplayName>kicq4WP</DisplayName>
     <PublisherDisplayName>inklime</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -16,11 +16,8 @@
   </Resources>
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="kicq4WP.App">
-      <m3:VisualElements DisplayName="kicq" Square150x150Logo="Assets\Logo.png" Square44x44Logo="Assets\SmallLogo.png" Description="Клиент kicq основанный на протоколе OSCAR." ForegroundText="light" BackgroundColor="transparent">
+      <m3:VisualElements DisplayName="kicq4WP" Square150x150Logo="Assets\Logo.png" Square44x44Logo="Assets\SmallLogo.png" Description="kicq4WP это клиент Icq реализующий протокол OSCAR." ForegroundText="light" BackgroundColor="transparent" ToastCapable="true">
         <m3:DefaultTile Wide310x150Logo="Assets\WideLogo.png" Square71x71Logo="Assets\Square71x71Logo.png">
-          <m3:ShowNameOnTiles>
-            <m3:ShowOn Tile="wide310x150Logo" />
-          </m3:ShowNameOnTiles>
         </m3:DefaultTile>
         <m3:SplashScreen Image="Assets\SplashScreen.png" />
         <m3:InitialRotationPreference>

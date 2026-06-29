@@ -1,0 +1,7 @@
+﻿[ResourceMetadata]
+"ResourceId"			"split.scale-140"
+"ResourceDimensions"		"scale-140"
+
+[Files]
+"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\split.scale-140.pri"			"resources.pri"
+"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\PackageLayout\Assets\Logo.scale-140.png"			"Assets\Logo.scale-140.png"

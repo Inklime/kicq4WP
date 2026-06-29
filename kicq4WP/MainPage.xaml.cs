@@ -15,6 +15,9 @@ namespace kicq4WP
     public sealed partial class MainPage : Page
     {
         private OscarProtocol _oscarProtocol;
+        private Task _;
+
+
         public ObservableCollection<Contact> Contacts { get; set; }
 
         public MainPage()
@@ -69,30 +72,129 @@ namespace kicq4WP
             await FileIO.WriteTextAsync(file, uin);
         }
 
+        private bool _initialized = false;
+
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            uint statusCode = 0x0000;
-            // 1. Приведение типа с проверкой
-            var oscarProtocol = e.Parameter as OscarProtocol;
 
-            // 2. Проверка на null перед использованием
-            if (oscarProtocol == null)
+            if (!_initialized)
             {
-                Debug.WriteLine("Error: Navigation parameter is not OscarProtocol");
-                return;
+                var oscarProtocol = e.Parameter as OscarProtocol;
+                if (oscarProtocol == null) return;
+
+                _oscarProtocol = oscarProtocol;
+                _initialized = true;
+
+                SaveLastUin(_oscarProtocol.UIN);
+                UinTextBlock.Text = _oscarProtocol.UIN;
+
+                // Подписываемся на реконнект
+                var reconnect = ((App)Application.Current).ReconnectService;
+                if (reconnect != null)
+                {
+                    reconnect.OnDisconnected += OnConnectionLost;
+                    reconnect.Reconnected += OnReconnected;
+                }
+
+                NotificationService.Instance.UnreadChanged += OnUnreadChanged;
+                LoadContacts(0x00000000);
             }
-
-            // 3. Присваивание полю класса только после проверки
-            _oscarProtocol = oscarProtocol;
-
-            Debug.WriteLine($"Setting login: {_oscarProtocol.UIN}");
-            SaveLastUin(_oscarProtocol.UIN);
-            // 5. Основная логика
-            LoadContacts(statusCode);
-            UinTextBlock.Text = _oscarProtocol.UIN;
         }
 
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+            NotificationService.Instance.UnreadChanged -= OnUnreadChanged;
+
+            var reconnect = ((App)Application.Current).ReconnectService;
+            if (reconnect != null)
+            {
+                reconnect.OnDisconnected -= OnConnectionLost;
+                reconnect.Reconnected -= OnReconnected;
+            }
+        }
+
+
+        private void OnConnectionLost()
+        {
+            UinTextBlock.Text = "Соединение...";
+            foreach (var contact in Contacts)
+            {
+                contact.StatusIcon = "/Assets/statuses/offline.png";
+                contact.IsNewOnline = false;
+            }
+        }
+
+        private void OnReconnected(OscarProtocol newOscar)
+        {
+            _oscarProtocol = newOscar;
+            UinTextBlock.Text = _oscarProtocol.UIN;
+            // Контакты уже в _oscarProtocol.contacts через InitServicesAsync
+            // Просто обновляем статусы на offline до прихода SNAC(03,0B)
+            foreach (var contact in Contacts)
+                contact.StatusIcon = "/Assets/statuses/offline.png";
+        }
+
+        private void OnUnreadChanged()
+        {
+            foreach (var contact in Contacts)
+            {
+                contact.UnreadCount = NotificationService.Instance.GetUnread(contact.Uin);
+            }
+        }
+
+        private bool _statusPanelVisible = false;
+
+        private void StatusButton_Click(object sender, RoutedEventArgs e)
+        {
+            _statusPanelVisible = !_statusPanelVisible;
+            StatusPanel.Visibility = _statusPanelVisible
+                ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void StatusPanelClose_Click(object sender, RoutedEventArgs e)
+        {
+            StatusPanel.Visibility = Visibility.Collapsed;
+            _statusPanelVisible = false;
+        }
+
+        private async void SetStatus_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            if (btn == null || _oscarProtocol == null) return;
+
+            string tagStr = btn.Tag as string;
+            if (string.IsNullOrEmpty(tagStr)) return;
+
+            try
+            {
+                uint statusCode = Convert.ToUInt32(tagStr, 16);
+                await _oscarProtocol.SendSetStatusAsync(statusCode);
+
+                // Обновляем иконку в шапке
+                string icon;
+                switch (statusCode & 0xFFFF)
+                {
+                    case 0x0001: icon = "away"; break;
+                    case 0x0002: icon = "dnd"; break;
+                    case 0x0004: icon = "na"; break;
+                    case 0x0010: icon = "busy"; break;
+                    case 0x0020: icon = "f4c"; break;
+                    case 0x0100: icon = "inv"; break;
+                    default: icon = "online"; break;
+                }
+                OwnStatusIcon.Source = new Windows.UI.Xaml.Media.Imaging.BitmapImage(
+                    new Uri("ms-appx:///Assets/statuses/" + icon + ".png"));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[Status ERROR] " + ex.Message);
+            }
+
+            StatusPanel.Visibility = Visibility.Collapsed;
+            _statusPanelVisible = false;
+        }
 
         private async void LoadContacts(uint statusCode)
         {
@@ -101,9 +203,7 @@ namespace kicq4WP
                 Contacts.Clear();
                 var parsedContacts = await _oscarProtocol.GetContactsAsync(statusCode);
                 foreach (var contact in parsedContacts)
-                {
                     Contacts.Add(contact);
-                }
             }
             catch (Exception ex)
             {
@@ -237,12 +337,12 @@ namespace kicq4WP
 
         private async void AcInfButton_Click(object sender, RoutedEventArgs e)
         {
-            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+            await ShowErrorDialog("В разработке");
         }
 
         private async void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
-            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+            await ShowErrorDialog("В разработке");
         }
 
         private async void HelpButton_Click(object sender, RoutedEventArgs e)
@@ -252,7 +352,7 @@ namespace kicq4WP
 
         private async void ExitButton_Click(object sender, RoutedEventArgs e)
         {
-            await ShowErrorDialog("Эта кнопка пока что ничего не делает...");
+            Application.Current.Exit();
         }
 
         private void ContactButton_Click(object sender, RoutedEventArgs e)
@@ -287,13 +387,6 @@ namespace kicq4WP
         }
     }
 
-    public class Contact
-    {
-        public string Uin { get; set; }
-        public string Name { get; set; }
-        public string StatusIcon { get; set; }
-        public string XtrazIcon { get; set; }
-        public bool IsNewOnline { get; set; }
-    }
+
 
 }
