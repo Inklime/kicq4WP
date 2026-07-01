@@ -90,6 +90,7 @@
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
     <Compile Include="BoolToVisibilityConverter.cs" />
+    <Compile Include="ContactInfo.cs" />
     <Compile Include="ContactStorage.cs" />
     <Compile Include="InfoPage.xaml.cs">
       <DependentUpon>InfoPage.xaml</DependentUpon>
@@ -112,6 +113,9 @@
     <Compile Include="Notificationservice.cs" />
     <Compile Include="OscarProtocol.cs" />
     <Compile Include="Reconnectservice.cs" />
+    <Compile Include="SearchPage.xaml.cs">
+      <DependentUpon>SearchPage.xaml</DependentUpon>
+    </Compile>
     <Compile Include="SettingsManager.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -207,6 +211,10 @@
     <Page Include="MainPage.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
+    </Page>
+    <Page Include="SearchPage.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
   </ItemGroup>
   <ItemGroup>

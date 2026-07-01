@@ -45,3 +45,8 @@ C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Relea
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\qualifiers.txt.intermediate
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\MultipleQualifiersPerDimensionFound.txt
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\ProjectArchitectures.txt
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\bin\Release\SearchPage.xbf
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\SearchPage.g.i.cs
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\SearchPage.g.cs
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\SearchPage.xaml
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\SearchPage.xbf

@@ -198,6 +198,10 @@
             <AppBarButton Icon="Emoji2" Label="Смайлики" Click="EmojiButton_Click" Foreground="White"/>
 
             <CommandBar.SecondaryCommands>
+                <AppBarButton Label="Скопировать UIN"  Icon="Copy"   Click="CopyUin_Click"/>
+                <AppBarButton Label="Информация"        Icon="People" Click="ContactInfo_Click"/>
+                <AppBarButton Label="Переименовать"     Icon="Edit"   Click="RenameContact_Click"/>
+                <AppBarButton Label="Удалить контакт"   Icon="Delete" Click="DeleteContact_Click"/>
                 <AppBarButton Label="Очистить чат" Icon="Delete" Click="ClearChat_Click"/>
             </CommandBar.SecondaryCommands>
         </CommandBar>

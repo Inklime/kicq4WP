@@ -9,6 +9,7 @@ using Windows.UI.Popups;
 using System.Diagnostics;
 using Windows.Storage;
 using kicq4WP;
+using System.Linq;
 
 namespace kicq4WP
 {
@@ -97,6 +98,8 @@ namespace kicq4WP
                     reconnect.Reconnected += OnReconnected;
                 }
 
+                _oscarProtocol.ContactStatusChanged += OnContactStatusChanged;
+
                 NotificationService.Instance.UnreadChanged += OnUnreadChanged;
                 LoadContacts(0x00000000);
             }
@@ -113,8 +116,16 @@ namespace kicq4WP
                 reconnect.OnDisconnected -= OnConnectionLost;
                 reconnect.Reconnected -= OnReconnected;
             }
+            _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged;
         }
 
+        private async void OnContactStatusChanged()
+        {
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                SortContacts();
+            });
+        }
 
         private void OnConnectionLost()
         {
@@ -128,10 +139,12 @@ namespace kicq4WP
 
         private void OnReconnected(OscarProtocol newOscar)
         {
+            if (_oscarProtocol != null)
+                _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged;
+
             _oscarProtocol = newOscar;
+            _oscarProtocol.ContactStatusChanged += OnContactStatusChanged;
             UinTextBlock.Text = _oscarProtocol.UIN;
-            // Контакты уже в _oscarProtocol.contacts через InitServicesAsync
-            // Просто обновляем статусы на offline до прихода SNAC(03,0B)
             foreach (var contact in Contacts)
                 contact.StatusIcon = "/Assets/statuses/offline.png";
         }
@@ -196,6 +209,27 @@ namespace kicq4WP
             _statusPanelVisible = false;
         }
 
+        private void SortContacts()
+        {
+            var sorted = Contacts
+                .OrderBy(c =>
+                {
+                    if (c.StatusIcon.Contains("online")) return 0;
+                    if (c.StatusIcon.Contains("f4c")) return 1;
+                    if (c.StatusIcon.Contains("away")) return 2;
+                    if (c.StatusIcon.Contains("busy")) return 3;
+                    if (c.StatusIcon.Contains("dnd")) return 4;
+                    if (c.StatusIcon.Contains("na")) return 5;
+                    if (c.StatusIcon.Contains("inv")) return 6;
+                    return 7; // offline
+        })
+                .ThenBy(c => c.Name)
+                .ToList();
+
+            Contacts.Clear();
+            foreach (var c in sorted) Contacts.Add(c);
+        }
+
         private async void LoadContacts(uint statusCode)
         {
             try
@@ -204,6 +238,7 @@ namespace kicq4WP
                 var parsedContacts = await _oscarProtocol.GetContactsAsync(statusCode);
                 foreach (var contact in parsedContacts)
                     Contacts.Add(contact);
+                SortContacts();
             }
             catch (Exception ex)
             {
@@ -343,6 +378,11 @@ namespace kicq4WP
         private async void SettingsButton_Click(object sender, RoutedEventArgs e)
         {
             await ShowErrorDialog("В разработке");
+        }
+
+        private void SearchButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(SearchPage), _oscarProtocol);
         }
 
         private async void HelpButton_Click(object sender, RoutedEventArgs e)

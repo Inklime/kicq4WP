@@ -1,0 +1,210 @@
+﻿<Page
+    x:Class="kicq4WP.SearchPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:kicq4WP"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="#FF0D1117">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Шапка -->
+        <Border Grid.Row="0" Background="#FF0078D7">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="56"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Click="BackButton_Click"
+                        Background="Transparent" BorderThickness="0"
+                        Width="56" Height="56" Padding="0" Margin="-58,0,0,-2">
+                    <TextBlock Text="         " FontFamily="Segoe UI Symbol" FontSize="28" FontWeight="Light"
+                               Foreground="White" VerticalAlignment="Center"
+                               HorizontalAlignment="Center" Width="110"/>
+                </Button>
+                <TextBlock Grid.Column="1" Text="Поиск пользователей"
+                           FontSize="20" FontFamily="Segoe WP"
+                           FontWeight="SemiBold" Foreground="White"
+                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+            </Grid>
+        </Border>
+
+        <!-- Форма поиска -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,10,12,0">
+
+                <!-- Pivot-like переключатель -->
+                <Grid Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BtnByDetails" Grid.Column="0"
+                            Content="По имени" Click="SearchMode_Click" Tag="details"
+                            Background="#FF0078D7" Foreground="White"
+                            BorderThickness="0" FontSize="14" FontFamily="Segoe WP"
+                            Height="40" Padding="0"/>
+                    <Button x:Name="BtnByUin" Grid.Column="1"
+                            Content="По UIN" Click="SearchMode_Click" Tag="uin"
+                            Background="#FF1A1A2E" Foreground="#AAFFFFFF"
+                            BorderThickness="0" FontSize="14" FontFamily="Segoe WP"
+                            Height="40" Padding="0"/>
+                    <Button x:Name="BtnByEmail" Grid.Column="2"
+                            Content="По Email" Click="SearchMode_Click" Tag="email"
+                            Background="#FF1A1A2E" Foreground="#AAFFFFFF"
+                            BorderThickness="0" FontSize="14" FontFamily="Segoe WP"
+                            Height="40" Padding="0"/>
+                </Grid>
+
+                <!-- Поиск по деталям -->
+                <StackPanel x:Name="PanelDetails" Visibility="Visible">
+                    <TextBlock Text="Имя" FontSize="13" Foreground="#88FFFFFF"
+                               FontFamily="Segoe WP" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtFirstName" PlaceholderText="Введите имя"
+                             Background="White" Foreground="Black"
+                             FontSize="17" FontFamily="Segoe WP"
+                             Margin="0,0,0,10"/>
+                    <TextBlock Text="Фамилия" FontSize="13" Foreground="#88FFFFFF"
+                               FontFamily="Segoe WP" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtLastName" PlaceholderText="Введите фамилию"
+                             Background="White" Foreground="Black"
+                             FontSize="17" FontFamily="Segoe WP"
+                             Margin="0,0,0,10"/>
+                    <TextBlock Text="Ник" FontSize="13" Foreground="#88FFFFFF"
+                               FontFamily="Segoe WP" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtNick" PlaceholderText="Введите ник"
+                             Background="White" Foreground="Black"
+                             FontSize="17" FontFamily="Segoe WP"
+                             Margin="0,0,0,10"/>
+                </StackPanel>
+
+                <!-- Поиск по UIN -->
+                <StackPanel x:Name="PanelUin" Visibility="Collapsed">
+                    <TextBlock Text="UIN" FontSize="13" Foreground="#88FFFFFF"
+                               FontFamily="Segoe WP" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtUin" PlaceholderText="Введите UIN"
+                             Background="White" Foreground="Black"
+                             FontSize="17" FontFamily="Segoe WP"
+                             InputScope="Number" Margin="0,0,0,10"/>
+                </StackPanel>
+
+                <!-- Поиск по Email -->
+                <StackPanel x:Name="PanelEmail" Visibility="Collapsed">
+                    <TextBlock Text="Email" FontSize="13" Foreground="#88FFFFFF"
+                               FontFamily="Segoe WP" Margin="0,0,0,4"/>
+                    <TextBox x:Name="TxtEmail" PlaceholderText="Введите email"
+                             Background="White" Foreground="Black"
+                             FontSize="17" FontFamily="Segoe WP"
+                             InputScope="EmailSmtpAddress" Margin="0,0,0,10"/>
+                </StackPanel>
+
+                <Button x:Name="BtnSearch" Content="Найти"
+                        Click="SearchButton_Click"
+                        Background="#FF0078D7" Foreground="White"
+                        BorderThickness="0" FontSize="18" FontFamily="Segoe WP"
+                        HorizontalAlignment="Stretch" Height="48"
+                        Margin="0,4,0,10"/>
+
+                <!-- Прогресс -->
+                <StackPanel x:Name="SearchProgress" Visibility="Collapsed"
+                            Orientation="Horizontal" HorizontalAlignment="Center"
+                            Margin="0,0,0,10">
+                    <ProgressRing IsActive="True" Width="28" Height="28"
+                                  Foreground="#FF0078D7" Margin="0,0,10,0"/>
+                    <TextBlock Text="Поиск..." FontSize="16" Foreground="White"
+                               FontFamily="Segoe WP" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Результаты -->
+        <ListView x:Name="ResultsList"
+                  Grid.Row="2"
+                  Background="Transparent"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  Margin="0,0,0,0">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0,0,0,1"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Background="#FF161B22" MinHeight="72" Margin="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="56"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Онлайн индикатор -->
+                        <Border Grid.Column="0"
+                                Width="32" Height="32"
+                                Background="#FF0078D7"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Initials}"
+                                       FontSize="16" FontFamily="Segoe WP"
+                                       FontWeight="Bold" Foreground="White"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+
+                        <!-- Инфо -->
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                    Margin="8,0,8,0">
+                            <TextBlock Text="{Binding DisplayName}"
+                                       FontSize="17" FontWeight="SemiBold"
+                                       FontFamily="Segoe WP" Foreground="White"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding UinLine}"
+                                       FontSize="13" FontFamily="Segoe WP"
+                                       Foreground="#88FFFFFF"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding EmailLine}"
+                                       FontSize="12" FontFamily="Segoe WP"
+                                       Foreground="#66FFFFFF"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+
+                        <!-- Кнопка добавить -->
+                        <Button Grid.Column="2"
+                                Content="+"
+                                Tag="{Binding Uin}"
+                                Click="AddContact_Click"
+                                Background="#FF0078D7"
+                                Foreground="White"
+                                BorderThickness="0"
+                                Width="44" Height="44"
+                                FontSize="24"
+                                Margin="0,0,8,0"
+                                VerticalAlignment="Center"
+                                Padding="0"/>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <!-- Статус строка -->
+        <Border Grid.Row="3" Background="#FF161B22" Padding="12,8,12,8">
+            <TextBlock x:Name="StatusText"
+                       Text=""
+                       FontSize="14" FontFamily="Segoe WP"
+                       Foreground="#88FFFFFF"
+                       HorizontalAlignment="Center"/>
+        </Border>
+    </Grid>
+</Page>

@@ -35,9 +35,11 @@ namespace kicq4WP
         private ObservableCollection<Contact> contacts;
         private Dictionary<string, List<string[]>> _pendingMessages =
         new Dictionary<string, List<string[]>>();
+        public event Action ContactStatusChanged;
         public Action<string> StatusUpdater { get; set; }
         public event Action<string, string> IncomingMessage;
-
+        private Dictionary<ushort, SsiGroup> _ssiGroups = new Dictionary<ushort, SsiGroup>();
+        public event Action<List<SearchResult>, bool> SearchResultReceived;
         private ushort _snacRequestId = 1;
 
         private static readonly HashSet<ushort> IcqSupportedFamilies = new HashSet<ushort>
@@ -74,6 +76,19 @@ namespace kicq4WP
             _dispatcher = dispatcher;
 
             Debug.WriteLine($"[OscarProtocol] Created with UIN: {_uin}");
+        }
+
+        public class SsiGroup
+        {
+            public ushort GroupId { get; set; }
+            public ushort ItemId { get; set; }
+            public string Name { get; set; }
+            public List<ushort> MemberIds { get; set; }
+
+            public SsiGroup()
+            {
+                MemberIds = new List<ushort>();
+            }
         }
 
         internal string GetContactStatus(string uin)
@@ -881,19 +896,47 @@ namespace kicq4WP
 
         private async Task SendIcbmParametersAsync()
         {
+            // Channel 1 — plain text, flags=0x0B (receive+send+missed notifications)
             using (var ms = new MemoryStream())
-            using (var writer = new BinaryWriter(ms))
             {
-                writer.Write(SwapUInt16(0x0000)); // channel
-                writer.Write(SwapUInt32(0x00000003)); // flags: отправка + получение
-                writer.Write(SwapUInt16(0x1F40)); // max message snac size
-                writer.Write(SwapUInt16(0x03E7)); // max sender warning level
-                writer.Write(SwapUInt16(0x03E7)); // max receiver warning level
-                writer.Write(SwapUInt32(0x00000000)); // min message interval (ms)
-
-                await SendSnacAsync(0x04, 0x02, 0x00, GetNextRequestID(), ms.ToArray());
-                Debug.WriteLine("[ICBM] Sent SNAC(04,02) — ICBM parameters");
+                WriteU16BE(ms, 0x0001);       // channel 1
+                WriteU32BE(ms, 0x0000000B);   // flags: 0x01 receive + 0x02 send + 0x08 missed msg notify
+                WriteU16BE(ms, 0x1F40);       // max message snac size = 8000
+                WriteU16BE(ms, 0x03E7);       // max sender warning level
+                WriteU16BE(ms, 0x03E7);       // max receiver warning level
+                WriteU32BE(ms, 0x00000000);   // min message interval
+                await SendSnacAsync(0x04, 0x02, 0x0000, GetNextRequestID(), ms.ToArray());
             }
+
+            await Task.Delay(100);
+
+            // Channel 2 — rich text / rendezvous
+            using (var ms = new MemoryStream())
+            {
+                WriteU16BE(ms, 0x0002);
+                WriteU32BE(ms, 0x00000003);   // receive + send
+                WriteU16BE(ms, 0x1F40);
+                WriteU16BE(ms, 0x03E7);
+                WriteU16BE(ms, 0x03E7);
+                WriteU32BE(ms, 0x00000000);
+                await SendSnacAsync(0x04, 0x02, 0x0000, GetNextRequestID(), ms.ToArray());
+            }
+
+            await Task.Delay(100);
+
+            // Channel 4 — old-style ICQ messages
+            using (var ms = new MemoryStream())
+            {
+                WriteU16BE(ms, 0x0004);
+                WriteU32BE(ms, 0x00000003);
+                WriteU16BE(ms, 0x1F40);
+                WriteU16BE(ms, 0x03E7);
+                WriteU16BE(ms, 0x03E7);
+                WriteU32BE(ms, 0x00000000);
+                await SendSnacAsync(0x04, 0x02, 0x0000, GetNextRequestID(), ms.ToArray());
+            }
+
+            Debug.WriteLine("[ICBM] Sent SNAC(04,02) for channels 1, 2, 4");
         }
 
 
@@ -1141,16 +1184,14 @@ namespace kicq4WP
             try
             {
                 int offset = 0;
-
                 byte version = data[offset++];
                 ushort itemCount = ReadU16(data, ref offset);
-                Debug.WriteLine($"[ParseContactListPacket] Item count: {itemCount}");
+                Debug.WriteLine("[ParseContactListPacket] Item count: " + itemCount);
 
                 for (int i = 0; i < itemCount; i++)
                 {
                     if (offset + 2 > data.Length) break;
                     ushort nameLen = ReadU16(data, ref offset);
-
                     if (offset + nameLen > data.Length) break;
                     string name = Encoding.UTF8.GetString(data, offset, nameLen);
                     offset += nameLen;
@@ -1159,70 +1200,302 @@ namespace kicq4WP
                     ushort groupId = ReadU16(data, ref offset);
                     ushort itemId = ReadU16(data, ref offset);
                     ushort itemType = ReadU16(data, ref offset);
-                    ushort tlvLen = ReadU16(data, ref offset);
+                    ushort tlvBlockLen = ReadU16(data, ref offset);
 
-                    if (offset + tlvLen > data.Length)
+                    if (offset + tlvBlockLen > data.Length)
                     {
-                        Debug.WriteLine($"[ParseContactListPacket] Broken TLV block. Len={tlvLen}, Remaining={data.Length - offset}");
+                        Debug.WriteLine("[ParseContactListPacket] Broken TLV block");
                         break;
                     }
 
+                    int tlvEnd = offset + tlvBlockLen;
+
+                    // Разбираем TLV блок
                     string displayName = null;
+                    List<ushort> memberIds = new List<ushort>();
 
                     int tlvOffset = offset;
-                    while (tlvOffset + 4 <= offset + tlvLen)
+                    while (tlvOffset + 4 <= tlvEnd)
                     {
                         ushort tlvType = ReadU16(data, ref tlvOffset);
                         ushort tlvValueLen = ReadU16(data, ref tlvOffset);
 
-                        if (tlvOffset + tlvValueLen > offset + tlvLen)
+                        if (tlvOffset + tlvValueLen > tlvEnd)
                         {
-                            Debug.WriteLine($"[ParseContactListPacket] Invalid TLV. Type=0x{tlvType:X4}, Len={tlvValueLen}, Remaining={offset + tlvLen - tlvOffset}");
+                            Debug.WriteLine("[ParseContactListPacket] TLV overflow, type=0x" + tlvType.ToString("X4"));
                             break;
                         }
 
-                        if (tlvType == 0x0131 && tlvValueLen > 0)
+                        switch (tlvType)
                         {
-                            displayName = Encoding.UTF8.GetString(data, tlvOffset, tlvValueLen);
+                            case 0x0131: // display name (nickname)
+                                if (tlvValueLen > 0)
+                                    displayName = Encoding.UTF8.GetString(data, tlvOffset, tlvValueLen);
+                                break;
+
+                            case 0x00C9: // group member list — список itemId контактов в группе
+                                for (int m = 0; m + 2 <= tlvValueLen; m += 2)
+                                {
+                                    int moff = tlvOffset + m;
+                                    ushort mid = (ushort)((data[moff] << 8) | data[moff + 1]);
+                                    memberIds.Add(mid);
+                                }
+                                break;
                         }
 
                         tlvOffset += tlvValueLen;
                     }
 
-                    offset += tlvLen;
+                    offset = tlvEnd;
 
-                    if (itemType == 0x0000) // Buddy record
+                    // Обрабатываем запись по типу
+                    switch (itemType)
                     {
-                        string finalName = !string.IsNullOrEmpty(displayName) ? displayName : name;
+                        case 0x0000: // Buddy — контакт
+                            {
+                                string finalName = !string.IsNullOrEmpty(displayName) ? displayName : name;
+                                contacts.Add(new Contact
+                                {
+                                    Uin = name,
+                                    Name = finalName,
+                                    GroupId = groupId,
+                                    ItemId = itemId,
+                                    StatusIcon = "/Assets/statuses/offline.png",
+                                    IsNewOnline = false
+                                });
+                                Debug.WriteLine("[ParseContactListPacket] Buddy: " + finalName +
+                                                " uin=" + name + " groupId=" + groupId + " itemId=" + itemId);
+                                break;
+                            }
 
-                        contacts.Add(new Contact
-                        {
-                            Uin = name,
-                            Name = finalName,
-                            StatusIcon = "/Assets/statuses/offline.png",
-                            IsNewOnline = false
-                        });
+                        case 0x0001: // Group — группа
+                            {
+                                var group = new SsiGroup
+                                {
+                                    GroupId = groupId,
+                                    ItemId = itemId,
+                                    Name = name,
+                                    MemberIds = memberIds
+                                };
+                                _ssiGroups[groupId] = group;
+                                Debug.WriteLine("[ParseContactListPacket] Group: " + name +
+                                                " groupId=" + groupId + " itemId=" + itemId +
+                                                " members=" + memberIds.Count);
+                                break;
+                            }
 
-                        Debug.WriteLine($"[ParseContactListPacket] Added contact: {finalName}");
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"[ParseContactListPacket] Skipped item type: 0x{itemType:X4}");
+                        case 0x0002: // Permit (allow list)
+                            Debug.WriteLine("[ParseContactListPacket] Permit: " + name);
+                            break;
+
+                        case 0x0003: // Deny (block list)
+                            Debug.WriteLine("[ParseContactListPacket] Deny: " + name);
+                            break;
+
+                        case 0x0004: // Visibility settings
+                            Debug.WriteLine("[ParseContactListPacket] Visibility settings");
+                            break;
+
+                        case 0x000F: // Non-buddy (ignore list)
+                            Debug.WriteLine("[ParseContactListPacket] Ignore: " + name);
+                            break;
+
+                        default:
+                            Debug.WriteLine("[ParseContactListPacket] Unknown type 0x" + itemType.ToString("X4") + " name=" + name);
+                            break;
                     }
                 }
 
-                // Проверяем время последнего изменения
+                // Время последнего изменения
                 if (offset + 4 <= data.Length)
                 {
-                    uint lastChange = (uint)((data[offset] << 24) | (data[offset + 1] << 16) |
-                                              (data[offset + 2] << 8) | data[offset + 3]);
-                    Debug.WriteLine($"[ParseContactListPacket] Last change time: {lastChange}");
+                    uint lastChange = ReadU32(data, ref offset);
+                    Debug.WriteLine("[ParseContactListPacket] Last change time: " + lastChange);
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ParseContactListPacket ERROR] {ex}");
+                Debug.WriteLine("[ParseContactListPacket ERROR] " + ex);
             }
+        }
+
+        // Вспомогательный: строим SSI item для отправки
+        private byte[] BuildSsiItem(string name, ushort groupId, ushort itemId,
+                                      ushort itemType, byte[] tlvData)
+        {
+            using (var ms = new MemoryStream())
+            using (var writer = new BinaryWriter(ms))
+            {
+                byte[] nameBytes = Encoding.UTF8.GetBytes(name ?? "");
+                writer.Write(SwapUInt16((ushort)nameBytes.Length));
+                writer.Write(nameBytes);
+                writer.Write(SwapUInt16(groupId));
+                writer.Write(SwapUInt16(itemId));
+                writer.Write(SwapUInt16(itemType));
+
+                if (tlvData != null && tlvData.Length > 0)
+                {
+                    writer.Write(SwapUInt16((ushort)tlvData.Length));
+                    writer.Write(tlvData);
+                }
+                else
+                {
+                    writer.Write(SwapUInt16(0x0000)); // нет TLV
+                }
+
+                return ms.ToArray();
+            }
+        }
+
+        // Удалить контакт
+        public async Task RemoveContactAsync(Contact contact)
+        {
+            Debug.WriteLine("[SSI] Removing " + contact.Uin);
+
+            // 1. Удаляем запись контакта
+            await SendSnacAsync(0x13, 0x0A, 0x00, GetNextRequestID(),
+                BuildSsiItem(contact.Uin, contact.GroupId, contact.ItemId, 0x0000, null));
+
+            var r1 = await ReceiveSnacWithTimeout(0x13, 0x0E, TimeSpan.FromSeconds(5));
+            if (r1 != null) Debug.WriteLine("[SSI] Delete result received");
+
+            await Task.Delay(150);
+
+            // 2. Обновляем группу — убираем itemId контакта из списка участников
+            if (_ssiGroups.ContainsKey(contact.GroupId))
+            {
+                var group = _ssiGroups[contact.GroupId];
+                group.MemberIds.Remove(contact.ItemId);
+
+                // Строим TLV(0x00C9) с новым списком
+                byte[] c9Data = new byte[group.MemberIds.Count * 2];
+                for (int i = 0; i < group.MemberIds.Count; i++)
+                {
+                    c9Data[i * 2] = (byte)(group.MemberIds[i] >> 8);
+                    c9Data[i * 2 + 1] = (byte)(group.MemberIds[i] & 0xFF);
+                }
+                byte[] c9Tlv = BuildTlv(0x00C9, c9Data);
+
+                await SendSnacAsync(0x13, 0x11, 0x00, GetNextRequestID(), null); // begin edit
+                await Task.Delay(100);
+
+                await SendSnacAsync(0x13, 0x09, 0x00, GetNextRequestID(),
+                    BuildSsiItem(group.Name, group.GroupId, group.ItemId, 0x0001, c9Tlv));
+
+                await SendSnacAsync(0x13, 0x12, 0x00, GetNextRequestID(), null); // end edit
+
+                await ReceiveSnacWithTimeout(0x13, 0x0E, TimeSpan.FromSeconds(5));
+            }
+
+            // Удаляем из локального кэша
+            if (contacts != null)
+            {
+                var c = contacts.FirstOrDefault(x => x.Uin == contact.Uin);
+                if (c != null)
+                {
+                    await _dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+                    {
+                        contacts.Remove(c);
+                    });
+                }
+            }
+
+            Debug.WriteLine("[SSI] Removed: " + contact.Uin);
+        }
+
+        // Переименовать контакт
+        public async Task RenameContactAsync(Contact contact, string newName)
+        {
+            Debug.WriteLine("[SSI] Renaming " + contact.Uin + " -> " + newName);
+
+            byte[] nameTlv = BuildTlv(0x0131, Encoding.UTF8.GetBytes(newName));
+
+            await SendSnacAsync(0x13, 0x11, 0x00, GetNextRequestID(), null); // begin edit
+            await Task.Delay(100);
+
+            await SendSnacAsync(0x13, 0x09, 0x00, GetNextRequestID(),
+                BuildSsiItem(contact.Uin, contact.GroupId, contact.ItemId, 0x0000, nameTlv));
+
+            await SendSnacAsync(0x13, 0x12, 0x00, GetNextRequestID(), null); // end edit
+
+            var result = await ReceiveSnacWithTimeout(0x13, 0x0E, TimeSpan.FromSeconds(5));
+            if (result != null)
+            {
+                contact.Name = newName;
+                if (contacts != null)
+                {
+                    var c = contacts.FirstOrDefault(x => x.Uin == contact.Uin);
+                    if (c != null)
+                        await _dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
+                            () => c.Name = newName);
+                }
+                Debug.WriteLine("[SSI] Renamed OK");
+            }
+        }
+
+        // Перенести контакт в другую группу
+        public async Task MoveContactAsync(Contact contact, ushort newGroupId)
+        {
+            if (!_ssiGroups.ContainsKey(newGroupId))
+            {
+                Debug.WriteLine("[SSI] Target group not found: " + newGroupId);
+                return;
+            }
+
+            var oldGroup = _ssiGroups.ContainsKey(contact.GroupId)
+                ? _ssiGroups[contact.GroupId] : null;
+            var newGroup = _ssiGroups[newGroupId];
+
+            await SendSnacAsync(0x13, 0x11, 0x00, GetNextRequestID(), null); // begin edit
+
+            // Удаляем из старой группы
+            if (oldGroup != null)
+            {
+                oldGroup.MemberIds.Remove(contact.ItemId);
+                byte[] oldC9 = new byte[oldGroup.MemberIds.Count * 2];
+                for (int i = 0; i < oldGroup.MemberIds.Count; i++)
+                {
+                    oldC9[i * 2] = (byte)(oldGroup.MemberIds[i] >> 8);
+                    oldC9[i * 2 + 1] = (byte)(oldGroup.MemberIds[i] & 0xFF);
+                }
+                await SendSnacAsync(0x13, 0x09, 0x00, GetNextRequestID(),
+                    BuildSsiItem(oldGroup.Name, oldGroup.GroupId, oldGroup.ItemId,
+                                 0x0001, BuildTlv(0x00C9, oldC9)));
+            }
+
+            // Обновляем запись контакта с новым groupId
+            await SendSnacAsync(0x13, 0x09, 0x00, GetNextRequestID(),
+                BuildSsiItem(contact.Uin, newGroupId, contact.ItemId, 0x0000, null));
+
+            // Добавляем в новую группу
+            newGroup.MemberIds.Add(contact.ItemId);
+            byte[] newC9 = new byte[newGroup.MemberIds.Count * 2];
+            for (int i = 0; i < newGroup.MemberIds.Count; i++)
+            {
+                newC9[i * 2] = (byte)(newGroup.MemberIds[i] >> 8);
+                newC9[i * 2 + 1] = (byte)(newGroup.MemberIds[i] & 0xFF);
+            }
+            await SendSnacAsync(0x13, 0x09, 0x00, GetNextRequestID(),
+                BuildSsiItem(newGroup.Name, newGroup.GroupId, newGroup.ItemId,
+                             0x0001, BuildTlv(0x00C9, newC9)));
+
+            await SendSnacAsync(0x13, 0x12, 0x00, GetNextRequestID(), null); // end edit
+
+            // Ждём ответы
+            await ReceiveSnacWithTimeout(0x13, 0x0E, TimeSpan.FromSeconds(5));
+            await ReceiveSnacWithTimeout(0x13, 0x0E, TimeSpan.FromSeconds(5));
+
+            // Обновляем локально
+            contact.GroupId = newGroupId;
+            contact.Group = newGroup.Name;
+
+            Debug.WriteLine("[SSI] Moved " + contact.Uin + " to group " + newGroup.Name);
+        }
+
+        // Получить список групп (для UI)
+        public List<SsiGroup> GetGroups()
+        {
+            return new List<SsiGroup>(_ssiGroups.Values);
         }
 
         private ushort ReadU16(byte[] data, ref int offset)
@@ -1443,59 +1716,91 @@ namespace kicq4WP
 
         public async Task SendIcbmAsync(string toUin, string text)
         {
+            Debug.WriteLine("[ICBM] Sending to " + toUin + " (" + text.Length + " chars)");
+
+            byte[] msgBytes = Encoding.BigEndianUnicode.GetBytes(text);
+            Debug.WriteLine("[ICBM] Encoded: " + msgBytes.Length + " bytes UTF-16BE");
+
+            if (msgBytes.Length > 7000)
+                throw new Exception("Сообщение слишком длинное (" + msgBytes.Length + " байт)");
+
             using (var ms = new MemoryStream())
-            using (var writer = new BinaryWriter(ms))
             {
+                // === 8 байт cookie ===
                 uint uptime = (uint)Environment.TickCount;
                 uint rand = (uint)new Random().Next();
-                writer.Write(SwapUInt32(uptime));
-                writer.Write(SwapUInt32(rand));
+                WriteU32BE(ms, uptime);
+                WriteU32BE(ms, rand);
 
-                writer.Write(SwapUInt16(0x0001)); // channel 1
+                // === channel 1 (2 байта BE) ===
+                WriteU16BE(ms, 0x0001);
 
+                // === UIN ===
                 byte[] uinBytes = Encoding.UTF8.GetBytes(toUin);
-                writer.Write((byte)uinBytes.Length);
-                writer.Write(uinBytes);
+                ms.WriteByte((byte)uinBytes.Length);
+                ms.Write(uinBytes, 0, uinBytes.Length);
 
-                // UTF-16 Big Endian
-                byte[] msgBytes = Encoding.BigEndianUnicode.GetBytes(text);
-
-                // fragment 0x05: capabilities (text=1)
-                byte[] caps = new byte[] { 0x05, 0x01, 0x00, 0x01, 0x01 };
-
-                // fragment 0x01: charset 0x0002 = UTF-16 BE
-                byte[] textFrag;
-                using (var tfms = new MemoryStream())
-                using (var tfw = new BinaryWriter(tfms))
+                // === TLV(0x0002) — message data ===
+                // Собираем содержимое TLV заранее чтобы знать длину
+                using (var tlvMs = new MemoryStream())
                 {
-                    tfw.Write((byte)0x01);
-                    tfw.Write((byte)0x01);
-                    ushort textDataLen = (ushort)(4 + msgBytes.Length);
-                    tfw.Write(SwapUInt16(textDataLen));
-                    tfw.Write(SwapUInt16(0x0002)); // charset UTF-16 BE
-                    tfw.Write(SwapUInt16(0xFFFF)); // language
-                    tfw.Write(msgBytes);
-                    textFrag = tfms.ToArray();
+                    // Fragment 0x05: capabilities
+                    // 05 01 [len_BE_2] [caps...]
+                    // caps = { 0x01 } = text capability
+                    byte[] caps = new byte[] { 0x01 };
+                    tlvMs.WriteByte(0x05); // fragment id
+                    tlvMs.WriteByte(0x01); // fragment version
+                    WriteU16BEStream(tlvMs, (ushort)caps.Length);
+                    tlvMs.Write(caps, 0, caps.Length);
+
+                    // Fragment 0x01: text
+                    // 01 01 [len_BE_2] [charset_BE_2] [lang_BE_2] [text...]
+                    // len = 2 (charset) + 2 (lang) + msgBytes.Length
+                    ushort textFragLen = (ushort)(2 + 2 + msgBytes.Length);
+                    tlvMs.WriteByte(0x01); // fragment id
+                    tlvMs.WriteByte(0x01); // fragment version
+                    WriteU16BEStream(tlvMs, textFragLen);
+                    WriteU16BEStream(tlvMs, 0x0002); // charset UTF-16 BE
+                    WriteU16BEStream(tlvMs, 0xFFFF); // language
+                    tlvMs.Write(msgBytes, 0, msgBytes.Length);
+
+                    byte[] tlvData = tlvMs.ToArray();
+
+                    // Пишем TLV(0x0002)
+                    WriteU16BE(ms, 0x0002);
+                    WriteU16BE(ms, (ushort)tlvData.Length);
+                    ms.Write(tlvData, 0, tlvData.Length);
                 }
 
-                byte[] msgData;
-                using (var mdms = new MemoryStream())
-                {
-                    mdms.Write(caps, 0, caps.Length);
-                    mdms.Write(textFrag, 0, textFrag.Length);
-                    msgData = mdms.ToArray();
-                }
+                // === TLV(0x0006) — store if offline (пустой) ===
+                WriteU16BE(ms, 0x0006);
+                WriteU16BE(ms, 0x0000);
 
-                writer.Write(SwapUInt16(0x0002));
-                writer.Write(SwapUInt16((ushort)msgData.Length));
-                writer.Write(msgData);
-
-                writer.Write(SwapUInt16(0x0006));
-                writer.Write(SwapUInt16(0x0000));
-
-                await SendSnacAsync(0x04, 0x06, 0x0000, GetNextRequestID(), ms.ToArray());
-                Debug.WriteLine($"[ICBM] Sent to {toUin}: {text}");
+                byte[] payload = ms.ToArray();
+                await SendSnacAsync(0x04, 0x06, 0x0000, GetNextRequestID(), payload);
+                Debug.WriteLine("[ICBM] Sent OK, payload=" + payload.Length + " bytes");
             }
+        }
+
+        // Вспомогательные методы записи big-endian
+        private void WriteU16BE(MemoryStream ms, ushort value)
+        {
+            ms.WriteByte((byte)(value >> 8));
+            ms.WriteByte((byte)(value & 0xFF));
+        }
+
+        private void WriteU32BE(MemoryStream ms, uint value)
+        {
+            ms.WriteByte((byte)(value >> 24));
+            ms.WriteByte((byte)(value >> 16));
+            ms.WriteByte((byte)(value >> 8));
+            ms.WriteByte((byte)(value & 0xFF));
+        }
+
+        private void WriteU16BEStream(MemoryStream ms, ushort value)
+        {
+            ms.WriteByte((byte)(value >> 8));
+            ms.WriteByte((byte)(value & 0xFF));
         }
 
 
@@ -1605,6 +1910,22 @@ namespace kicq4WP
             }
         }
 
+        private void HandleMetaResponse(byte[] data)
+        {
+            try
+            {
+                var results = new List<SearchResult>();
+                bool isLast = false;
+                ParseSearchResponse(data, results, out isLast);
+
+                if (SearchResultReceived != null)
+                    SearchResultReceived(results, isLast);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[HandleMetaResponse ERROR] " + ex.Message);
+            }
+        }
 
         public async Task SendMessageAsync(string uin, string message)
         {
@@ -1881,12 +2202,69 @@ namespace kicq4WP
                         case 0x0007:
                             HandleIncomingIcbm(snac.Data);
                             break;
+                        case 0x000A: // missed message
+                            HandleMissedMessage(snac.Data);
+                            break;
+                    }
+                    break;
+                case 0x0015:
+                    switch (snac.Subtype)
+                    {
+                        case 0x0003:
+                            Debug.WriteLine("[Search] Got META response, parsing...");
+                            HandleMetaResponse(snac.Data);
+                            break;
                     }
                     break;
             }
         }
 
 
+        private void HandleMissedMessage(byte[] data)
+        {
+            try
+            {
+                int offset = 0;
+                if (offset + 2 > data.Length) return;
+                ushort channel = ReadU16(data, ref offset);
+
+                byte uinLen = data[offset++];
+                string uin = Encoding.UTF8.GetString(data, offset, uinLen);
+                offset += uinLen;
+
+                offset += 2; // warning level
+
+                ushort tlvCount = ReadU16(data, ref offset);
+                for (int i = 0; i < tlvCount && offset + 4 <= data.Length; i++)
+                {
+                    int peekOff = offset + 2;
+                    ushort tlen = ReadU16(data, ref peekOff);
+                    offset += 4 + tlen;
+                }
+
+                if (offset + 4 > data.Length) return;
+                ushort missedCount = ReadU16(data, ref offset);
+                ushort reason = ReadU16(data, ref offset);
+
+                string reasonStr;
+                switch (reason)
+                {
+                    case 0: reasonStr = "Invalid message"; break;
+                    case 1: reasonStr = "Message too large"; break;
+                    case 2: reasonStr = "Rate exceeded"; break;
+                    case 3: reasonStr = "Sender too evil"; break;
+                    case 4: reasonStr = "You are too evil"; break;
+                    default: reasonStr = "Unknown (" + reason + ")"; break;
+                }
+
+                Debug.WriteLine("[MissedMsg] From=" + uin + " count=" + missedCount +
+                                " reason=" + reasonStr + " channel=" + channel);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[MissedMsg ERROR] " + ex.Message);
+            }
+        }
 
         private async Task HandleUserOfflineAsync(byte[] data)
         {
@@ -1923,6 +2301,7 @@ namespace kicq4WP
                         if (contact != null)
                         {
                             contact.StatusIcon = "/Assets/statuses/offline.png";
+                            if (ContactStatusChanged != null) ContactStatusChanged();
                             contact.IsNewOnline = false;
                         }
                     });
@@ -1959,6 +2338,447 @@ namespace kicq4WP
             {
                 Debug.WriteLine($"[HandleServiceFamilies ERROR] {ex.Message}");
             }
+        }
+
+        // ── Вспомогательный: построить META запрос ──────────────────────────
+        private byte[] BuildMetaRequest(ushort subtype, ushort seq, byte[] body)
+        {
+            uint ownerUin = uint.Parse(_uin);
+
+            using (var inner = new MemoryStream())
+            {
+                // Всё в little-endian внутри META
+                ushort bodyLen = (ushort)(body != null ? body.Length : 0);
+                ushort chunkSize = (ushort)(2 + 4 + 2 + 2 + bodyLen); // size field не считает себя
+
+                WriteU16LE(inner, chunkSize);       // data chunk size (LE)
+                WriteU32LE(inner, ownerUin);        // owner uin (LE)
+                WriteU16LE(inner, 0x07D0);          // META_DATA_REQ (LE)
+                WriteU16LE(inner, seq);             // sequence (LE)
+                WriteU16LE(inner, subtype);         // subtype (LE)
+                if (body != null)
+                    inner.Write(body, 0, body.Length);
+
+                byte[] innerData = inner.ToArray();
+
+                // Оборачиваем в TLV(0x0001)
+                using (var outer = new MemoryStream())
+                {
+                    WriteU16BE(outer, 0x0001);              // TLV type
+                    WriteU16BE(outer, (ushort)innerData.Length);
+                    outer.Write(innerData, 0, innerData.Length);
+                    return outer.ToArray();
+                }
+            }
+        }
+
+        private void WriteU16LE(MemoryStream ms, ushort v)
+        {
+            ms.WriteByte((byte)(v & 0xFF));
+            ms.WriteByte((byte)(v >> 8));
+        }
+
+        private void WriteU32LE(MemoryStream ms, uint v)
+        {
+            ms.WriteByte((byte)(v & 0xFF));
+            ms.WriteByte((byte)((v >> 8) & 0xFF));
+            ms.WriteByte((byte)((v >> 16) & 0xFF));
+            ms.WriteByte((byte)((v >> 24) & 0xFF));
+        }
+
+        // ── Asciiz строка с LE length-prefix ────────────────────────────────
+        private void WriteAsciiz(MemoryStream ms, string s)
+        {
+            byte[] b = Encoding.UTF8.GetBytes(s ?? "");
+            WriteU16LE(ms, (ushort)(b.Length + 1)); // +1 для нулевого байта
+            ms.Write(b, 0, b.Length);
+            ms.WriteByte(0x00); // null terminator
+        }
+
+        // ── Поиск по UIN — subtype 0x051F ───────────────────────────────────
+        public async Task<List<SearchResult>> SearchByUinAsync(string uin, ushort seq)
+        {
+            uint uinNum = uint.Parse(uin);
+
+            using (var body = new MemoryStream())
+            {
+                // TLV(0x0136) — UIN в виде dword LE
+                body.WriteByte(0x36); body.WriteByte(0x01); // type=0x0136 LE
+                body.WriteByte(0x04); body.WriteByte(0x00); // len=4 LE
+                WriteU32LE(body, uinNum);
+
+                byte[] payload = BuildMetaRequest(0x0569, seq, body.ToArray());
+                await SendSnacAsync(0x15, 0x02, 0x0001, GetNextRequestID(), payload);
+                Debug.WriteLine("[Search] Sent SearchByUin(TLV) " + uin);
+            }
+
+            return await WaitForSearchResults();
+        }
+
+        // ── Поиск по деталям — subtype 0x0515 ───────────────────────────────
+        public async Task<List<SearchResult>> SearchByDetailsAsync(
+            string firstName, string lastName, string nick, ushort seq)
+        {
+            using (var body = new MemoryStream())
+            {
+                // Порядок из дампа: nick, first, last — все ASCIIZ с LE len-prefix
+                WriteAsciiz(body, nick);
+                WriteAsciiz(body, firstName);
+                WriteAsciiz(body, lastName);
+
+                byte[] payload = BuildMetaRequest(0x0533, seq, body.ToArray());
+                await SendSnacAsync(0x15, 0x02, 0x0001, GetNextRequestID(), payload);
+                Debug.WriteLine("[Search] Sent SearchByDetails(whitepages)");
+            }
+
+            return await WaitForSearchResults();
+        }
+
+        // ── Поиск по email — subtype 0x0529 ─────────────────────────────────
+        public async Task<List<SearchResult>> SearchByEmailAsync(string email, ushort seq)
+        {
+            using (var body = new MemoryStream())
+            {
+                // TLV(0x015E) — email string
+                body.WriteByte(0x5E); body.WriteByte(0x01); // type=0x015E LE
+                byte[] emailBytes = Encoding.UTF8.GetBytes(email);
+                ushort emailTlvLen = (ushort)(emailBytes.Length + 1); // +null
+                body.WriteByte((byte)(emailTlvLen & 0xFF));
+                body.WriteByte((byte)(emailTlvLen >> 8));
+                body.Write(emailBytes, 0, emailBytes.Length);
+                body.WriteByte(0x00); // null terminator
+
+                // TLV(0x0230) — flags (из дампа: 02 01 00 00)
+                body.WriteByte(0x30); body.WriteByte(0x02);
+                body.WriteByte(0x04); body.WriteByte(0x00);
+                body.WriteByte(0x01); body.WriteByte(0x00); body.WriteByte(0x00); body.WriteByte(0x00);
+
+                byte[] payload = BuildMetaRequest(0x0573, seq, body.ToArray());
+                await SendSnacAsync(0x15, 0x02, 0x0001, GetNextRequestID(), payload);
+                Debug.WriteLine("[Search] Sent SearchByEmail(TLV) " + email);
+            }
+
+            return await WaitForSearchResults();
+        }
+
+        // ── Приём результатов поиска ─────────────────────────────────────────
+        private async Task<List<SearchResult>> ReceiveSearchResults(
+            ushort seq, TimeSpan timeout)
+        {
+            var results = new List<SearchResult>();
+            var deadline = DateTime.UtcNow + timeout;
+
+            while (DateTime.UtcNow < deadline)
+            {
+                var flap = await ReceiveFlapWithTimeout(deadline - DateTime.UtcNow);
+                if (flap == null) break;
+                if (flap.Channel != 0x02 || flap.Data.Length < 10) continue;
+
+                var snac = SnacPacket.Parse(flap.Data);
+                if (snac == null) continue;
+
+                // Ищем SNAC(15,03)
+                if (snac.Family != 0x0015 || snac.Subtype != 0x0003)
+                {
+                    // Другие пакеты — обрабатываем нормально и продолжаем ждать
+                    await HandleFlapAsync(flap);
+                    continue;
+                }
+
+                // Парсим META ответ
+                bool isLast = false;
+                ParseSearchResponse(snac.Data, results, out isLast);
+
+                if (isLast) break;
+            }
+
+            Debug.WriteLine("[Search] Got " + results.Count + " results");
+            return results;
+        }
+
+        private Task<List<SearchResult>> WaitForSearchResults()
+        {
+            var tcs = new TaskCompletionSource<List<SearchResult>>();
+            var allResults = new List<SearchResult>();
+
+            Action<List<SearchResult>, bool> handler = null;
+            handler = (results, isLast) =>
+            {
+                allResults.AddRange(results);
+                if (isLast)
+                {
+                    SearchResultReceived -= handler;
+                    tcs.TrySetResult(allResults);
+                }
+            };
+            SearchResultReceived += handler;
+
+            // Таймаут 10 секунд
+            Task.Delay(10000).ContinueWith(_ =>
+            {
+                SearchResultReceived -= handler;
+                tcs.TrySetResult(allResults);
+            });
+
+            return tcs.Task;
+        }
+
+        // ── Парсинг SNAC(15,03) ответа ──────────────────────────────────────
+        private void ParseSearchResponse(byte[] data, List<SearchResult> results, out bool isLast)
+        {
+            isLast = false;
+            Debug.WriteLine("[ParseSearch] Data length=" + data.Length +
+                            " hex=" + BitConverter.ToString(data));
+            try
+            {
+                int offset = 0;
+                while (offset + 4 <= data.Length)
+                {
+                    ushort tlvType = ReadU16(data, ref offset);
+                    ushort tlvLen = ReadU16(data, ref offset);
+                    Debug.WriteLine("[ParseSearch] TLV type=0x" + tlvType.ToString("X4") +
+                                    " len=" + tlvLen);
+                    if (offset + tlvLen > data.Length) break;
+
+                    if (tlvType == 0x0001)
+                    {
+                        Debug.WriteLine("[ParseSearch] Found TLV(0001), parsing META reply...");
+                        ParseMetaSearchReply(data, offset, tlvLen, results, out isLast);
+                    }
+                    offset += tlvLen;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ParseSearch ERROR] " + ex);
+            }
+        }
+
+        private void ParseMetaSearchReply(byte[] data, int start, int len,
+            List<SearchResult> results, out bool isLast)
+        {
+            isLast = false;
+            int offset = start;
+            int end = start + len;
+
+            if (offset + 10 > end) return;
+
+            // LE header: chunkSize(2) ownerUin(4) dataType(2) seq(2)
+            offset += 2; // chunk size
+            offset += 4; // owner uin
+            offset += 2; // data type (должен быть 0x07DA)
+            offset += 2; // sequence
+
+            if (offset + 2 > end) return;
+            ushort subtype = ReadU16LE(data, ref offset);
+
+            Debug.WriteLine("[Search] META reply subtype=0x" + subtype.ToString("X4"));
+
+            // 0x01AE — последний результат (или единственный для UIN поиска)
+            // 0x01A4 — промежуточный результат
+            if (subtype == 0x01AE)
+            {
+                isLast = true;
+                // Может содержать последний результат
+                if (offset + 1 > end) return;
+                byte success = data[offset++];
+                if (success != 0x0A) return; // не SEARCH_SUCCESS
+
+                var r = ParseSearchRecord(data, ref offset, end);
+                if (r != null) results.Add(r);
+            }
+            else if (subtype == 0x01A4)
+            {
+                if (offset + 1 > end) return;
+                byte success = data[offset++];
+                if (success != 0x0A) return;
+
+                var r = ParseSearchRecord(data, ref offset, end);
+                if (r != null) results.Add(r);
+            }
+        }
+
+        private SearchResult ParseSearchRecord(byte[] data, ref int offset, int end)
+        {
+            try
+            {
+                if (offset + 2 > end) return null;
+                ushort dataSize = ReadU16LE(data, ref offset); // LE!
+
+                if (offset + 4 > end) return null;
+                uint uin = ReadU32LE(data, ref offset); // LE!
+
+                string nick = ReadAsciizLE(data, ref offset, end);
+                string first = ReadAsciizLE(data, ref offset, end);
+                string last = ReadAsciizLE(data, ref offset, end);
+                string email = ReadAsciizLE(data, ref offset, end);
+
+                if (offset + 1 > end) return null;
+                byte authFlag = data[offset++];
+
+                if (offset + 2 > end) return null;
+                ushort onlineStatus = ReadU16LE(data, ref offset);
+
+                if (offset + 1 > end) return null;
+                byte gender = data[offset++];
+
+                if (offset + 2 > end) return null;
+                ushort age = ReadU16LE(data, ref offset);
+
+                Debug.WriteLine("[Search] Found: uin=" + uin + " nick=" + nick +
+                                " name=" + first + " " + last + " online=" + (onlineStatus == 1));
+
+                return new SearchResult
+                {
+                    Uin = uin.ToString(),
+                    Nick = nick,
+                    FirstName = first,
+                    LastName = last,
+                    Email = email,
+                    IsOnline = onlineStatus == 1,
+                    Gender = gender,
+                    Age = age
+                };
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ParseSearchRecord ERROR] " + ex.Message);
+                return null;
+            }
+        }
+
+        // ── LE читалки ───────────────────────────────────────────────────────
+        private ushort ReadU16LE(byte[] data, ref int offset)
+        {
+            ushort v = (ushort)(data[offset] | (data[offset + 1] << 8));
+            offset += 2;
+            return v;
+        }
+
+        private uint ReadU32LE(byte[] data, ref int offset)
+        {
+            uint v = (uint)(data[offset] |
+                            (data[offset + 1] << 8) |
+                            (data[offset + 2] << 16) |
+                            (data[offset + 3] << 24));
+            offset += 4;
+            return v;
+        }
+
+        private string ReadAsciizLE(byte[] data, ref int offset, int end)
+        {
+            if (offset + 2 > end) return "";
+            ushort len = ReadU16LE(data, ref offset);
+            if (len == 0) return "";
+            if (offset + len > end) return "";
+            // ASCIIZ: убираем нулевой байт в конце
+            int textLen = len > 0 && data[offset + len - 1] == 0 ? len - 1 : len;
+            string s = DecodeWin1251(data, offset, textLen);
+            offset += len;
+            return s;
+        }
+
+        // ── Добавление контакта (SNAC 13,08) ────────────────────────────────
+        public async Task AddContactAsync(string uin, string displayName)
+        {
+            // Генерируем уникальный itemId
+            ushort newItemId = GenerateItemId();
+
+            // Находим группу General (или первую доступную)
+            ushort targetGroupId = 0x0000;
+            string targetGroupName = "";
+            ushort targetGroupItemId = 0x0000;
+
+            foreach (var g in _ssiGroups.Values)
+            {
+                // Берём первую не-мастер группу
+                if (g.GroupId != 0x0000)
+                {
+                    targetGroupId = g.GroupId;
+                    targetGroupName = g.Name;
+                    targetGroupItemId = g.ItemId;
+                    break;
+                }
+            }
+
+            // Если нет групп — создаём General
+            if (targetGroupId == 0x0000 && _ssiGroups.Count == 0)
+            {
+                targetGroupId = 0x0001;
+                targetGroupName = "General";
+                targetGroupItemId = 0x0000;
+            }
+
+            Debug.WriteLine("[AddContact] Adding " + uin + " to group " +
+                            targetGroupName + " itemId=" + newItemId);
+
+            // TLV(0x0131) — display name
+            byte[] nameTlv = BuildTlv(0x0131, Encoding.UTF8.GetBytes(displayName));
+
+            await SendSnacAsync(0x13, 0x11, 0x00, GetNextRequestID(), null); // begin edit
+            await Task.Delay(100);
+
+            // Добавляем контакт
+            await SendSnacAsync(0x13, 0x08, 0x00, GetNextRequestID(),
+                BuildSsiItem(uin, targetGroupId, newItemId, 0x0000, nameTlv));
+
+            // Обновляем группу — добавляем itemId
+            if (_ssiGroups.ContainsKey(targetGroupId))
+            {
+                var group = _ssiGroups[targetGroupId];
+                group.MemberIds.Add(newItemId);
+
+                byte[] c9Data = new byte[group.MemberIds.Count * 2];
+                for (int i = 0; i < group.MemberIds.Count; i++)
+                {
+                    c9Data[i * 2] = (byte)(group.MemberIds[i] >> 8);
+                    c9Data[i * 2 + 1] = (byte)(group.MemberIds[i] & 0xFF);
+                }
+                await SendSnacAsync(0x13, 0x09, 0x00, GetNextRequestID(),
+                    BuildSsiItem(targetGroupName, targetGroupId, targetGroupItemId,
+                                 0x0001, BuildTlv(0x00C9, c9Data)));
+            }
+
+            await SendSnacAsync(0x13, 0x12, 0x00, GetNextRequestID(), null); // end edit
+
+            // Ждём подтверждение
+            var r = await ReceiveSnacWithTimeout(0x13, 0x0E, TimeSpan.FromSeconds(5));
+            if (r != null)
+            {
+                // Добавляем в локальный кэш
+                var newContact = new Contact
+                {
+                    Uin = uin,
+                    Name = displayName,
+                    GroupId = targetGroupId,
+                    ItemId = newItemId,
+                    Group = targetGroupName,
+                    StatusIcon = "/Assets/statuses/offline.png"
+                };
+
+                if (contacts != null)
+                {
+                    await _dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal,
+                        () => contacts.Add(newContact));
+                }
+
+                if (_ssiGroups.ContainsKey(targetGroupId))
+                    _ssiGroups[targetGroupId].MemberIds.Add(newItemId);
+
+                Debug.WriteLine("[AddContact] Added: " + uin);
+            }
+        }
+
+        private ushort GenerateItemId()
+        {
+            // Находим максимальный существующий itemId и берём следующий
+            ushort maxId = 0;
+            if (contacts != null)
+            {
+                foreach (var c in contacts)
+                    if (c.ItemId > maxId) maxId = c.ItemId;
+            }
+            return (ushort)(maxId + 1);
         }
 
         private async Task HandleServiceVersionsResponse(byte[] data)
@@ -2018,77 +2838,105 @@ namespace kicq4WP
             try
             {
                 int offset = 0;
-
                 while (offset < data.Length)
                 {
-                    // byte: uin string length
                     if (offset + 1 > data.Length) break;
                     byte uinLen = data[offset++];
                     if (uinLen == 0 || offset + uinLen > data.Length) break;
 
-                    // string: uin
                     string uin = Encoding.UTF8.GetString(data, offset, uinLen);
                     offset += uinLen;
 
-                    // word: warning level (unused)
                     if (offset + 2 > data.Length) break;
-                    offset += 2;
+                    offset += 2; // warning level
 
-                    // word: number of TLVs
                     if (offset + 2 > data.Length) break;
-                    ushort tlvCount = ReadU16(data, ref offset); // big-endian ReadU16
+                    ushort tlvCount = ReadU16(data, ref offset);
 
-                    uint status = 0xFFFFFFFF; // неизвестен пока не прочитаем TLV(06)
+                    // Собираем всю информацию из TLV
+                    var info = new ContactInfo { Uin = uin };
+                    uint status = 0;
 
                     for (int i = 0; i < tlvCount && offset + 4 <= data.Length; i++)
                     {
                         ushort tlvType = ReadU16(data, ref offset);
                         ushort tlvLen = ReadU16(data, ref offset);
+                        int tlvEnd = offset + tlvLen;
 
-                        if (offset + tlvLen > data.Length)
+                        if (tlvEnd > data.Length) break;
+
+                        switch (tlvType)
                         {
-                            Debug.WriteLine($"[HandleUserOnline] TLV 0x{tlvType:X4} выходит за пределы данных");
-                            break;
+                            case 0x0001: // user class
+                                if (tlvLen >= 2)
+                                    info.UserClass = ReadU16(data, ref offset);
+                                break;
+
+                            case 0x0006: // user status
+                                if (tlvLen >= 4)
+                                {
+                                    status = ReadU32(data, ref offset);
+                                    info.Status = status;
+                                }
+                                break;
+
+                            case 0x000A: // external IP
+                                if (tlvLen >= 4)
+                                    info.ExternalIp = ReadU32(data, ref offset);
+                                break;
+
+                            case 0x000F: // online time (seconds)
+                                if (tlvLen >= 4)
+                                    info.OnlineTime = ReadU32(data, ref offset);
+                                break;
+
+                            case 0x0003: // signon time
+                                if (tlvLen >= 4)
+                                    info.SignonTime = ReadU32(data, ref offset);
+                                break;
+
+                            case 0x0005: // member since
+                                if (tlvLen >= 4)
+                                    info.MemberSince = ReadU32(data, ref offset);
+                                break;
+
+                            case 0x000C: // DC info
+                                if (tlvLen >= 9)
+                                {
+                                    info.DcInternalIp = ReadU32(data, ref offset);
+                                    info.DcPort = (ushort)(ReadU32(data, ref offset) & 0xFFFF);
+                                    info.DcType = data[offset];
+                                }
+                                break;
                         }
 
-                        if (tlvType == 0x0006 && tlvLen == 4)
-                        {
-                            status = ReadU32(data, ref offset);
-                            Debug.WriteLine($"[HandleUserOnline] {uin} status=0x{status:X8}");
-                        }
-                        else
-                        {
-                            offset += tlvLen; // пропускаем остальные TLV
-                        }
+                        offset = tlvEnd; // всегда прыгаем в конец TLV
                     }
 
-                    Debug.WriteLine($"[HandleUserOnline] {uin} is online, status=0x{status:X8}");
-
-                    string iconPath = status == 0xFFFFFFFF
-                        ? "/Assets/statuses/online.png"
-                        : StatusIconHelper.GetIconForStatus(status);
+                    Debug.WriteLine("[UserOnline] " + uin + " status=0x" + status.ToString("X8"));
 
                     await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                     {
                         if (contacts == null) return;
                         var contact = contacts.FirstOrDefault(c => c.Uin == uin);
-                        if (contact == null)
-                        {
-                            Debug.WriteLine($"[HandleUserOnline] Контакт {uin} не найден");
-                            return;
-                        }
-                        contact.StatusIcon = iconPath;
+                        if (contact == null) return;
+
+                        contact.StatusIcon = StatusIconHelper.GetIconForStatus(status);
+                        contact.Info = info;
                         contact.IsNewOnline = true;
 
                         Task.Delay(5000).ContinueWith(_ =>
                             _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
                                 contact.IsNewOnline = false).AsTask());
                     });
+
+                    if (ContactStatusChanged != null)
+                        ContactStatusChanged();
                 }
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[HandleUserOnline ERROR] {ex}");
+                Debug.WriteLine("[HandleUserOnline ERROR] " + ex);
             }
         }
 
@@ -2104,14 +2952,29 @@ namespace kicq4WP
         {
             public static string GetIconForStatus(uint status)
             {
-                switch (status & 0xFFFF) // нижние 2 байта — базовый статус
+                // Базовый статус — нижние 2 байта
+                ushort baseStatus = (ushort)(status & 0xFFFF);
+
+                switch (baseStatus)
                 {
                     case 0x0000: return "/Assets/statuses/online.png";
                     case 0x0001: return "/Assets/statuses/away.png";
                     case 0x0002: return "/Assets/statuses/dnd.png";
                     case 0x0004: return "/Assets/statuses/na.png";
-                    case 0x0010: return "/Assets/statuses/inv.png";
-                    default: return "/Assets/statuses/unknown.png";
+                    case 0x0010: return "/Assets/statuses/busy.png";   // occupied
+                    case 0x0020: return "/Assets/statuses/f4c.png";    // free4chat
+                    case 0x0100: return "/Assets/statuses/inv.png";    // invisible
+
+                    case 0x3000: return "/Assets/statuses/angry.png";  // злой
+                    case 0x4000: return "/Assets/statuses/depressed.png"; // депрессия
+                    case 0x5000: return "/Assets/statuses/home.png";   // дома
+                    case 0x6000: return "/Assets/statuses/work.png";   // работа
+                    case 0x2001: return "/Assets/statuses/eating.png"; // обед (0x1001 флаг + 0x2000?)
+
+                    default:
+                        Debug.WriteLine("[Status] Unknown status=0x" + status.ToString("X8") +
+                                        " base=0x" + baseStatus.ToString("X4"));
+                        return "/Assets/statuses/online.png";
                 }
             }
         }

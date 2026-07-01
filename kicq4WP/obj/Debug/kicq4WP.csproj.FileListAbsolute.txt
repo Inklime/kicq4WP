@@ -23,14 +23,14 @@ C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\App.xaml
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\InfoPage.xaml
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\ChatPage.xaml
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\LoginPage.xaml
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\MainPage.xaml
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\App.xbf
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\InfoPage.xbf
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\ChatPage.xbf
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\LoginPage.xbf
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\MainPage.xbf
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\XamlSaveStateFile.xml
-C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\LoginPage.xaml
-C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\LoginPage.xbf
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\kicq4WP.exe
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\kicq4WP.pdb
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\priconfig.xml
@@ -45,3 +45,8 @@ C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\qualifiers.txt.intermediate
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\MultipleQualifiersPerDimensionFound.txt
 C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\ProjectArchitectures.txt
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\bin\Debug\SearchPage.xbf
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\SearchPage.g.i.cs
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\SearchPage.g.cs
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\SearchPage.xaml
+C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Debug\SearchPage.xbf

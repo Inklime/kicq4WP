@@ -35,6 +35,11 @@
 					<Value>MainPage.xbf</Value>
 				</Candidate>
 			</NamedResource>
+			<NamedResource name="SearchPage.xbf" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/SearchPage.xbf">
+				<Candidate type="Path">
+					<Value>SearchPage.xbf</Value>
+				</Candidate>
+			</NamedResource>
 			<ResourceMapSubtree name="Assets">
 				<NamedResource name="desc.txt" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/desc.txt">
 					<Candidate type="Path">

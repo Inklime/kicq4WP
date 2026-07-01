@@ -4,6 +4,7 @@
 
 [Files]
 "C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\filemap.pri"			"resources.pri"
+"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\SearchPage.xbf"			"SearchPage.xbf"
 "C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\MainPage.xbf"			"MainPage.xbf"
 "C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\LoginPage.xbf"			"LoginPage.xbf"
 "C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\kicq4WP.xr.xml"			"kicq4WP.xr.xml"

@@ -26,11 +26,11 @@
     <Page.BottomAppBar>
         <CommandBar IsSticky="True" Opened="CommandBar_Opened" Background="#FF0078D7">
             <AppBarButton Icon="Account" Label="Статус" Click="StatusButton_Click" Foreground="White"/>
-            <AppBarButton Icon="Contact"    Label="Акк. Инфо" Click="AcInfButton_Click" Foreground="White"/>
+            <AppBarButton Icon="AddFriend"    Label="Добавить" Click="SearchButton_Click" Foreground="White"/>
             <AppBarButton Icon="Cancel"     Label="Выйти" Click="LogoutButton_Click" Foreground="White"/>
             <CommandBar.SecondaryCommands>
                 <AppBarButton Icon="Setting" Label="Настройки" Click="SettingsButton_Click"/>
-                <AppBarButton Icon="Help"    Label="Справка"   Click="HelpButton_Click"/>
+                <AppBarButton Icon="Contact"    Label="Профиль" Click="AcInfButton_Click" Foreground="White"/>
                 <AppBarButton Icon="Cancel"  Label="Выход"     Click="ExitButton_Click"/>
             </CommandBar.SecondaryCommands>
         </CommandBar>

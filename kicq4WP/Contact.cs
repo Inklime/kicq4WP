@@ -20,6 +20,14 @@ public class Contact : INotifyPropertyChanged
     private string _statusIcon;
 
     [DataMember]
+    public ContactInfo Info { get; set; }
+
+    [DataMember]
+    public ushort ItemId { get; set; }
+    [DataMember]
+    public ushort GroupId { get; set; }
+
+    [DataMember]
     public string StatusIcon
     {
         get { return _statusIcon; }

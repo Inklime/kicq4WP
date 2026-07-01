@@ -39,14 +39,14 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Button x:ConnectionId='16' Grid.Column="0"
+                <Button x:ConnectionId='8' Grid.Column="0"
                                                 
                         Background="Transparent"
                         BorderThickness="0"
-                        Width="52" Height="56" RenderTransformOrigin="0.176,0.56" Grid.ColumnSpan="2" Margin="-24,0,0,-2">
-                    <TextBlock Text="" FontFamily="Segoe UI Symbol"
+                        Width="52" Height="56" RenderTransformOrigin="0.176,0.56" Margin="-58,1,0,-3">
+                    <TextBlock Text="         " FontFamily="Segoe UI Symbol"
                                FontSize="22" Foreground="White"
-                               VerticalAlignment="Center" HorizontalAlignment="Center" Width="31"/>
+                               VerticalAlignment="Center" HorizontalAlignment="Center" Width="79"/>
                 </Button>
 
                 <Image Grid.Column="1"
@@ -150,20 +150,14 @@
                 Visibility="Collapsed">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <Button x:ConnectionId='10' Content=":-)"                           Tag="*SMILE*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='11' Content=";-)"                           Tag="*WINK*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='12' Content=":-D"                           Tag="*LAUGH*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='13' Content=":-("                           Tag="*SAD*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='14' Content=":'("                           Tag="*CRY*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='15' Content=":-O"                           Tag="*SHOCKED*" Style="{StaticResource EmojiButtonStyle}"/>
+                    <Button x:ConnectionId='5' Content=":-)"                           Tag=":-)" Style="{StaticResource EmojiButtonStyle}"/>
+                    <Button x:ConnectionId='6' Content=";-)"                           Tag=";-)" Style="{StaticResource EmojiButtonStyle}"/>
+                    <Button x:ConnectionId='7' Content=":-("                           Tag=":-(" Style="{StaticResource EmojiButtonStyle}"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <Button x:ConnectionId='4' Content=":-P"                           Tag="*TONGUE*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='5' Content=":angry:"                           Tag="*ANGRY*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='6' Content="8-)"                           Tag="*COOL*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='7' Content=":-*"                           Tag="*KISS*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='8' Content="(Y)"                           Tag="*THUMBSUP*" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button x:ConnectionId='9' Content="&lt;3"                           Tag="*HEART*" Style="{StaticResource EmojiButtonStyle}"/>
+                    <Button x:ConnectionId='2' Content="8-)"                           Tag="8-)" Style="{StaticResource EmojiButtonStyle}"/>
+                    <Button x:ConnectionId='3' Content=":-D"                           Tag=":-D" Style="{StaticResource EmojiButtonStyle}"/>
+                    <Button x:ConnectionId='4' Content="]:->"                           Tag="]:->" Style="{StaticResource EmojiButtonStyle}"/>
                 </StackPanel>
             </StackPanel>
         </Border>
@@ -177,20 +171,9 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <Button x:ConnectionId='1' Grid.Column="0"
-                                                 
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Width="78" Height="19"
-                        VerticalAlignment="Bottom" Margin="0,0,0,-1" HorizontalAlignment="Left">
-                    <TextBlock Text=":-)" FontSize="18"
-                               Foreground="#FF0078D7"
-                               FontFamily="Segoe WP"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center"/>
-                </Button>
 
-                <TextBox x:ConnectionId='2' x:Name="MessageTextBox"
+
+                <TextBox x:ConnectionId='1' x:Name="MessageTextBox"
                          PlaceholderText="Сообщение..."
                          Background="#FF2A2A2A"
                          Foreground="White"
@@ -203,26 +186,23 @@
                          TextWrapping="Wrap"
                          MaxHeight="120"
                          VerticalAlignment="Bottom"
-                                                          Grid.ColumnSpan="3" Margin="74,0,113.333,8"/>
+                                                          Grid.ColumnSpan="2" Margin="10,0,9.333,0"/>
 
-                <Button x:ConnectionId='3' Grid.Column="2"
-                                                 
-                        Background="#FF0078D7"
-                        BorderThickness="0"
-                        Width="46" Height="63"
-                        Margin="5.667,-5,0,-1"
-                        VerticalAlignment="Bottom">
-                    <TextBlock Text="" FontFamily="Segoe UI Symbol"
-                               FontSize="22" Foreground="White"
-                               VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                </Button>
+
             </Grid>
         </Border>
     </Grid>
     <Page.BottomAppBar>
         <CommandBar Background="#FF0078D7">
+            <AppBarButton x:ConnectionId='9' Icon="Send" Label="Отправить"                           Foreground="White"/>
+            <AppBarButton x:ConnectionId='10' Icon="Emoji2" Label="Смайлики"                           Foreground="White"/>
+
             <CommandBar.SecondaryCommands>
-                <AppBarButton x:ConnectionId='17' Label="Очистить чат" Icon="Delete"                        />
+                <AppBarButton x:ConnectionId='11' Label="Скопировать UIN"  Icon="Copy"                        />
+                <AppBarButton x:ConnectionId='12' Label="Информация"        Icon="People"                          />
+                <AppBarButton x:ConnectionId='13' Label="Переименовать"     Icon="Edit"                              />
+                <AppBarButton x:ConnectionId='14' Label="Удалить контакт"   Icon="Delete"                            />
+                <AppBarButton x:ConnectionId='15' Label="Очистить чат" Icon="Delete"                        />
             </CommandBar.SecondaryCommands>
         </CommandBar>
     </Page.BottomAppBar>

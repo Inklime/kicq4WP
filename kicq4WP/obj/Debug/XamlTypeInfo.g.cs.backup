@@ -124,7 +124,7 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
 
         private void InitTypeTables()
         {
-            _typeNameTable = new string[17];
+            _typeNameTable = new string[20];
             _typeNameTable[0] = "kicq4WP.InfoPage";
             _typeNameTable[1] = "Windows.UI.Xaml.Controls.Page";
             _typeNameTable[2] = "Windows.UI.Xaml.Controls.UserControl";
@@ -140,10 +140,13 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
             _typeNameTable[12] = "System.Collections.ObjectModel.ObservableCollection`1<Contact>";
             _typeNameTable[13] = "System.Collections.ObjectModel.Collection`1<Contact>";
             _typeNameTable[14] = "Contact";
-            _typeNameTable[15] = "Boolean";
-            _typeNameTable[16] = "Int32";
+            _typeNameTable[15] = "UInt16";
+            _typeNameTable[16] = "System.ValueType";
+            _typeNameTable[17] = "Boolean";
+            _typeNameTable[18] = "Int32";
+            _typeNameTable[19] = "kicq4WP.SearchPage";
 
-            _typeTable = new global::System.Type[17];
+            _typeTable = new global::System.Type[20];
             _typeTable[0] = typeof(global::kicq4WP.InfoPage);
             _typeTable[1] = typeof(global::Windows.UI.Xaml.Controls.Page);
             _typeTable[2] = typeof(global::Windows.UI.Xaml.Controls.UserControl);
@@ -159,8 +162,11 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
             _typeTable[12] = typeof(global::System.Collections.ObjectModel.ObservableCollection<global::Contact>);
             _typeTable[13] = typeof(global::System.Collections.ObjectModel.Collection<global::Contact>);
             _typeTable[14] = typeof(global::Contact);
-            _typeTable[15] = typeof(global::System.Boolean);
-            _typeTable[16] = typeof(global::System.Int32);
+            _typeTable[15] = typeof(global::System.UInt16);
+            _typeTable[16] = typeof(global::System.ValueType);
+            _typeTable[17] = typeof(global::System.Boolean);
+            _typeTable[18] = typeof(global::System.Int32);
+            _typeTable[19] = typeof(global::kicq4WP.SearchPage);
         }
 
         private int LookupTypeIndexByName(string typeName)
@@ -204,6 +210,7 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
         private object Activate_12_ObservableCollection() { return new global::System.Collections.ObjectModel.ObservableCollection<global::Contact>(); }
         private object Activate_13_Collection() { return new global::System.Collections.ObjectModel.Collection<global::Contact>(); }
         private object Activate_14_Contact() { return new global::Contact(); }
+        private object Activate_19_SearchPage() { return new global::kicq4WP.SearchPage(); }
         private void MapAdd_5_ObservableDictionary(object instance, object key, object item)
         {
             var collection = (global::System.Collections.Generic.IDictionary<global::System.String, global::System.Object>)instance;
@@ -328,6 +335,8 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
                 userType.AddMemberName("Name");
                 userType.AddMemberName("Group");
                 userType.AddMemberName("XtrazIcon");
+                userType.AddMemberName("ItemId");
+                userType.AddMemberName("GroupId");
                 userType.AddMemberName("StatusIcon");
                 userType.AddMemberName("IsNewOnline");
                 userType.AddMemberName("UnreadCount");
@@ -336,12 +345,30 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
                 xamlType = userType;
                 break;
 
-            case 15:   //  Boolean
+            case 15:   //  UInt16
+                userType = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("System.ValueType"));
+                userType.SetIsReturnTypeStub();
+                xamlType = userType;
+                break;
+
+            case 16:   //  System.ValueType
+                userType = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Object"));
+                xamlType = userType;
+                break;
+
+            case 17:   //  Boolean
                 xamlType = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlSystemBaseType(typeName, type);
                 break;
 
-            case 16:   //  Int32
+            case 18:   //  Int32
                 xamlType = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 19:   //  kicq4WP.SearchPage
+                userType = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Windows.UI.Xaml.Controls.Page"));
+                userType.Activator = Activate_19_SearchPage;
+                userType.SetIsLocalType();
+                xamlType = userType;
                 break;
             }
             return xamlType;
@@ -408,37 +435,57 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
             var that = (global::Contact)instance;
             that.XtrazIcon = (global::System.String)Value;
         }
-        private object get_7_Contact_StatusIcon(object instance)
+        private object get_7_Contact_ItemId(object instance)
+        {
+            var that = (global::Contact)instance;
+            return that.ItemId;
+        }
+        private void set_7_Contact_ItemId(object instance, object Value)
+        {
+            var that = (global::Contact)instance;
+            that.ItemId = (global::System.UInt16)Value;
+        }
+        private object get_8_Contact_GroupId(object instance)
+        {
+            var that = (global::Contact)instance;
+            return that.GroupId;
+        }
+        private void set_8_Contact_GroupId(object instance, object Value)
+        {
+            var that = (global::Contact)instance;
+            that.GroupId = (global::System.UInt16)Value;
+        }
+        private object get_9_Contact_StatusIcon(object instance)
         {
             var that = (global::Contact)instance;
             return that.StatusIcon;
         }
-        private void set_7_Contact_StatusIcon(object instance, object Value)
+        private void set_9_Contact_StatusIcon(object instance, object Value)
         {
             var that = (global::Contact)instance;
             that.StatusIcon = (global::System.String)Value;
         }
-        private object get_8_Contact_IsNewOnline(object instance)
+        private object get_10_Contact_IsNewOnline(object instance)
         {
             var that = (global::Contact)instance;
             return that.IsNewOnline;
         }
-        private void set_8_Contact_IsNewOnline(object instance, object Value)
+        private void set_10_Contact_IsNewOnline(object instance, object Value)
         {
             var that = (global::Contact)instance;
             that.IsNewOnline = (global::System.Boolean)Value;
         }
-        private object get_9_Contact_UnreadCount(object instance)
+        private object get_11_Contact_UnreadCount(object instance)
         {
             var that = (global::Contact)instance;
             return that.UnreadCount;
         }
-        private void set_9_Contact_UnreadCount(object instance, object Value)
+        private void set_11_Contact_UnreadCount(object instance, object Value)
         {
             var that = (global::Contact)instance;
             that.UnreadCount = (global::System.Int32)Value;
         }
-        private object get_10_Contact_HasUnread(object instance)
+        private object get_12_Contact_HasUnread(object instance)
         {
             var that = (global::Contact)instance;
             return that.HasUnread;
@@ -493,28 +540,40 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
                 xamlMember.Getter = get_6_Contact_XtrazIcon;
                 xamlMember.Setter = set_6_Contact_XtrazIcon;
                 break;
+            case "Contact.ItemId":
+                userType = (global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Contact");
+                xamlMember = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlMember(this, "ItemId", "UInt16");
+                xamlMember.Getter = get_7_Contact_ItemId;
+                xamlMember.Setter = set_7_Contact_ItemId;
+                break;
+            case "Contact.GroupId":
+                userType = (global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Contact");
+                xamlMember = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlMember(this, "GroupId", "UInt16");
+                xamlMember.Getter = get_8_Contact_GroupId;
+                xamlMember.Setter = set_8_Contact_GroupId;
+                break;
             case "Contact.StatusIcon":
                 userType = (global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Contact");
                 xamlMember = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlMember(this, "StatusIcon", "String");
-                xamlMember.Getter = get_7_Contact_StatusIcon;
-                xamlMember.Setter = set_7_Contact_StatusIcon;
+                xamlMember.Getter = get_9_Contact_StatusIcon;
+                xamlMember.Setter = set_9_Contact_StatusIcon;
                 break;
             case "Contact.IsNewOnline":
                 userType = (global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Contact");
                 xamlMember = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlMember(this, "IsNewOnline", "Boolean");
-                xamlMember.Getter = get_8_Contact_IsNewOnline;
-                xamlMember.Setter = set_8_Contact_IsNewOnline;
+                xamlMember.Getter = get_10_Contact_IsNewOnline;
+                xamlMember.Setter = set_10_Contact_IsNewOnline;
                 break;
             case "Contact.UnreadCount":
                 userType = (global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Contact");
                 xamlMember = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlMember(this, "UnreadCount", "Int32");
-                xamlMember.Getter = get_9_Contact_UnreadCount;
-                xamlMember.Setter = set_9_Contact_UnreadCount;
+                xamlMember.Getter = get_11_Contact_UnreadCount;
+                xamlMember.Setter = set_11_Contact_UnreadCount;
                 break;
             case "Contact.HasUnread":
                 userType = (global::kicq4WP.kicq4WP_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Contact");
                 xamlMember = new global::kicq4WP.kicq4WP_XamlTypeInfo.XamlMember(this, "HasUnread", "Boolean");
-                xamlMember.Getter = get_10_Contact_HasUnread;
+                xamlMember.Getter = get_12_Contact_HasUnread;
                 xamlMember.SetIsReadOnly();
                 break;
             }
@@ -842,6 +901,5 @@ namespace kicq4WP.kicq4WP_XamlTypeInfo
         }
     }
 }
-
 
 

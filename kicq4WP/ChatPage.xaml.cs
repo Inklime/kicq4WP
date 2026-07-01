@@ -186,6 +186,175 @@ namespace kicq4WP
             ContactUinTextBlock.Text = _contact.Uin;
         }
 
+        private void CopyUin_Click(object sender, RoutedEventArgs e)
+        {
+            // WP8.1 использует другой API для буфера обмена
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(_contact.Uin);
+            // Clipboard недоступен в WP8.1 — используем share
+            // Просто показываем UIN чтобы пользователь мог скопировать вручную
+            var ignored = new Windows.UI.Popups.MessageDialog(
+                _contact.Uin, "UIN контакта").ShowAsync();
+        }
+
+        private async void ContactInfo_Click(object sender, RoutedEventArgs e)
+        {
+            var info = _contact.Info;
+
+            string statusText;
+            if (_contact.StatusIcon.Contains("offline"))
+                statusText = "Офлайн";
+            else if (info != null)
+                statusText = info.StatusText;
+            else
+                statusText = "Неизвестно";
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("UIN: " + _contact.Uin);
+            sb.AppendLine("Имя: " + _contact.Name);
+            sb.AppendLine("Группа: " + (_contact.Group ?? "—"));
+            sb.AppendLine("Статус: " + statusText);
+
+            if (info != null && !_contact.StatusIcon.Contains("offline"))
+            {
+                if (info.OnlineTime > 0)
+                    sb.AppendLine("Онлайн: " + info.OnlineTimeText);
+                if (info.SignonTime > 0)
+                    sb.AppendLine("Зашел: " + info.SignonTimeText);
+                if (info.MemberSince > 0)
+                    sb.AppendLine("Регистрация: " + info.MemberSinceText);
+                if (info.ExternalIp > 0)
+                    sb.AppendLine("IP: " + info.ExternalIpText);
+            }
+
+            await new Windows.UI.Popups.MessageDialog(
+                sb.ToString(), _contact.Name).ShowAsync();
+        }
+
+        private async void RenameContact_Click(object sender, RoutedEventArgs e)
+        {
+            await ShowRenamePopup(_contact, async (newName) =>
+            {
+                await _oscar.RenameContactAsync(_contact, newName);
+                ContactNameTextBlock.Text = _contact.Name;
+            });
+        }
+
+        private async void DeleteContact_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new Windows.UI.Popups.MessageDialog(
+                "Удалить " + _contact.Name + " из списка контактов?", "Удаление");
+
+            dialog.Commands.Add(new Windows.UI.Popups.UICommand("Удалить", async cmd =>
+            {
+                try
+                {
+                    await _oscar.RemoveContactAsync(_contact);
+                    Frame.GoBack();
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine("[Delete ERROR] " + ex.Message);
+                    await new Windows.UI.Popups.MessageDialog(
+                        "Ошибка удаления: " + ex.Message).ShowAsync();
+                }
+            }));
+            dialog.Commands.Add(new Windows.UI.Popups.UICommand("Отмена"));
+            await dialog.ShowAsync();
+        }
+
+        // Универсальный popup переименования
+        private async Task ShowRenamePopup(Contact contact, Func<string, Task> onSave)
+        {
+            var popup = new Windows.UI.Xaml.Controls.Primitives.Popup();
+
+            var panel = new StackPanel
+            {
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 13, 17, 23)),
+                Width = Window.Current.Bounds.Width,
+                Margin = new Thickness(20, 16, 20, 16)
+            };
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Новое имя для " + contact.Name,
+                FontSize = 16,
+                FontFamily = new Windows.UI.Xaml.Media.FontFamily("Segoe WP"),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(180, 255, 255, 255)),
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+
+            var input = new TextBox
+            {
+                Text = contact.Name,
+                FontSize = 18,
+                FontFamily = new Windows.UI.Xaml.Media.FontFamily("Segoe WP"),
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.Black),
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+            panel.Children.Add(input);
+
+            var btnOk = new Button
+            {
+                Content = "Сохранить",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 0, 120, 215)),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White),
+                FontSize = 17,
+                FontFamily = new Windows.UI.Xaml.Media.FontFamily("Segoe WP"),
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            panel.Children.Add(btnOk);
+
+            var btnCancel = new Button
+            {
+                Content = "Отмена",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 40, 40, 40)),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(180, 255, 255, 255)),
+                FontSize = 17,
+                FontFamily = new Windows.UI.Xaml.Media.FontFamily("Segoe WP")
+            };
+            panel.Children.Add(btnCancel);
+
+            popup.Child = panel;
+            popup.VerticalOffset = Window.Current.Bounds.Height - 300;
+
+            var tcs = new TaskCompletionSource<bool>();
+
+            btnOk.Click += async (s, args) =>
+            {
+                popup.IsOpen = false;
+                string newName = (input.Text ?? "").Trim();
+                if (!string.IsNullOrEmpty(newName) && newName != contact.Name)
+                {
+                    try { await onSave(newName); }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine("[Rename ERROR] " + ex.Message);
+                    }
+                }
+                tcs.TrySetResult(true);
+            };
+
+            btnCancel.Click += (s, args) =>
+            {
+                popup.IsOpen = false;
+                tcs.TrySetResult(false);
+            };
+
+            popup.IsOpen = true;
+            input.Focus(FocusState.Programmatic);
+            input.SelectAll();
+            await tcs.Task;
+        }
+
         private async void ClearChat_Click(object sender, RoutedEventArgs e)
         {
             _messages.Clear();

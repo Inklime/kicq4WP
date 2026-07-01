@@ -198,7 +198,11 @@
             <AppBarButton x:ConnectionId='10' Icon="Emoji2" Label="Смайлики"                           Foreground="White"/>
 
             <CommandBar.SecondaryCommands>
-                <AppBarButton x:ConnectionId='11' Label="Очистить чат" Icon="Delete"                        />
+                <AppBarButton x:ConnectionId='11' Label="Скопировать UIN"  Icon="Copy"                        />
+                <AppBarButton x:ConnectionId='12' Label="Информация"        Icon="People"                          />
+                <AppBarButton x:ConnectionId='13' Label="Переименовать"     Icon="Edit"                              />
+                <AppBarButton x:ConnectionId='14' Label="Удалить контакт"   Icon="Delete"                            />
+                <AppBarButton x:ConnectionId='15' Label="Очистить чат" Icon="Delete"                        />
             </CommandBar.SecondaryCommands>
         </CommandBar>
     </Page.BottomAppBar>
