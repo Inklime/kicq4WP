@@ -3,5 +3,5 @@
 "ResourceDimensions"		"scale-140"
 
 [Files]
-"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\filemap.scale-140.pri"			"resources.pri"
-"C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\Assets\Logo.scale-140.png"			"Assets\Logo.scale-140.png"
+"C:\Users\123\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\filemap.scale-140.pri"			"resources.pri"
+"C:\Users\123\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\obj\Release\PackageLayout\Assets\Logo.scale-140.png"			"Assets\Logo.scale-140.png"

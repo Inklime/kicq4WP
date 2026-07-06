@@ -22,16 +22,19 @@
         </Style>
     </Page.Resources>
 
+    <!-- Корневая сетка. Row 4 добавлена под панель ввода (превью ответа), -->
+    <!-- а поверх всего лежит RootOverlayGrid для попапов (переименование и т.п.) -->
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="56"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- Шапка -->
-        <Border Grid.Row="0" Background="#FF0078D7">
+        <Border Grid.Row="0" Background="{StaticResource PhoneAccentBrush}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="52"/>
@@ -95,12 +98,13 @@
                                 Background="#FF1E293B"
                                 Padding="10,7,10,7"
                                 Margin="0,0,50,0"
+                                Holding="MessageBorder_Holding"
                                 Visibility="{Binding IsIncoming, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
                                 <TextBlock Text="{Binding SenderName}"
                                            FontSize="12"
                                            FontFamily="Segoe WP"
-                                           Foreground="#FF4FC3F7"
+                                           Foreground="{StaticResource PhoneAccentBrush}"
                                            Margin="0,0,0,2"/>
                                 <TextBlock Text="{Binding Text}"
                                            FontSize="17"
@@ -119,9 +123,10 @@
                         <!-- Исходящее — справа -->
                         <Border HorizontalAlignment="Right"
                                 MaxWidth="280"
-                                Background="#FF004C97"
+                                Background="{StaticResource PhoneAccentBrush}"
                                 Padding="10,7,10,7"
                                 Margin="50,0,0,0"
+                                Holding="MessageBorder_Holding"
                                 Visibility="{Binding IsOutgoing, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
                                 <TextBlock Text="{Binding Text}"
@@ -162,8 +167,40 @@
             </StackPanel>
         </Border>
 
+        <!-- Панель "Ответить на сообщение" -->
+        <Border x:Name="ReplyPreviewPanel"
+                Grid.Row="3"
+                Background="#FF232323"
+                BorderBrush="{StaticResource PhoneAccentBrush}"
+                BorderThickness="4,0,0,0"
+                Padding="8,4,8,4"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="ReplyPreviewText"
+                           Grid.Column="0"
+                           Foreground="#CCFFFFFF"
+                           FontSize="14"
+                           FontFamily="Segoe WP"
+                           TextTrimming="CharacterEllipsis"
+                           MaxLines="1"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        Content="✕"
+                        Click="CancelReply_Click"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Foreground="White"
+                        FontSize="16"
+                        Padding="10,4,4,4"/>
+            </Grid>
+        </Border>
+
         <!-- Панель ввода -->
-        <Border Grid.Row="3" Background="#FF1A1A1A" Padding="6,6,6,6">
+        <Border Grid.Row="4" Background="#FF1A1A1A" Padding="6,6,6,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -171,29 +208,28 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-
-
                 <TextBox x:Name="MessageTextBox"
+                         Style="{StaticResource ChatInputStyle}"
                          PlaceholderText="Сообщение..."
-                         Background="#FF2A2A2A"
-                         Foreground="White"
-                         
-                         BorderBrush="#FF555555"
-                         BorderThickness="1"
-                         Padding="10,8,10,8"
-                         FontSize="17"
-                         FontFamily="Segoe WP"
-                         TextWrapping="Wrap"
-                         MaxHeight="120"
+                         Margin="4,0,10.333,0"
                          VerticalAlignment="Bottom"
-                         KeyDown="MessageTextBox_KeyDown" Grid.ColumnSpan="2" Margin="10,0,9.333,0"/>
-
-
+                         KeyDown="MessageTextBox_KeyDown"
+                         Grid.ColumnSpan="2"/>
             </Grid>
         </Border>
+
+        <!-- Полноэкранный оверлей для попапов (переименование и т.п.) -->
+        <!-- Grid.RowSpan="5" — растягиваем на всю страницу, чтобы не зависеть -->
+        <!-- от Popup и его смещений на разных DPI -->
+        <Grid x:Name="RootOverlayGrid"
+              Grid.RowSpan="5"
+              Background="#99000000"
+              Visibility="Collapsed">
+        </Grid>
     </Grid>
+
     <Page.BottomAppBar>
-        <CommandBar Background="#FF0078D7">
+        <CommandBar Background="{StaticResource PhoneAccentBrush}">
             <AppBarButton Icon="Send" Label="Отправить" Click="SendMessage_Click" Foreground="White"/>
             <AppBarButton Icon="Emoji2" Label="Смайлики" Click="EmojiButton_Click" Foreground="White"/>
 

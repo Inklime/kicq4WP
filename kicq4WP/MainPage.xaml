@@ -10,6 +10,7 @@
 
     <Page.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <local:ByteToOpacityConverter x:Key="ByteToOpacityConverter"/>
         <Style x:Key="StatusItemStyle" TargetType="Button">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -24,7 +25,7 @@
     </Page.Resources>
 
     <Page.BottomAppBar>
-        <CommandBar IsSticky="True" Opened="CommandBar_Opened" Background="#FF0078D7">
+        <CommandBar IsSticky="True" Opened="CommandBar_Opened" Background="{StaticResource PhoneAccentBrush}">
             <AppBarButton Icon="Account" Label="Статус" Click="StatusButton_Click" Foreground="White"/>
             <AppBarButton Icon="AddFriend"    Label="Добавить" Click="SearchButton_Click" Foreground="White"/>
             <AppBarButton Icon="Cancel"     Label="Выйти" Click="LogoutButton_Click" Foreground="White"/>
@@ -43,7 +44,7 @@
         </Grid.RowDefinitions>
 
         <!-- Шапка -->
-        <Border Grid.Row="0" Background="#FF0078D7">
+        <Border Grid.Row="0" Background="{StaticResource PhoneAccentBrush}">
             <Grid Margin="8,0,8,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -70,13 +71,12 @@
 
         <!-- Список контактов -->
         <ListView x:Name="ContactsListView"
-                  Grid.Row="1"
-                  ItemsSource="{Binding Contacts, Mode=OneWay}"
-                  IsItemClickEnabled="True"
-                  ItemClick="ContactsListView_ItemClick"
-                  SelectionMode="None"
-                  Background="Transparent"
-                  Margin="0,2,0,0">
+          Grid.Row="1"
+          IsItemClickEnabled="True"
+          ItemClick="ContactsListView_ItemClick"
+          SelectionMode="None"
+          Background="Transparent"
+          Margin="0,2,0,0">
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -85,15 +85,39 @@
                     <Setter Property="Background" Value="Transparent"/>
                 </Style>
             </ListView.ItemContainerStyle>
+            <ListView.GroupStyle>
+                <GroupStyle>
+                    <GroupStyle.HeaderTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource PhoneAccentBrush}"
+                        Padding="12,6,12,6"
+                        Margin="0,4,0,0">
+                                <TextBlock Text="{Binding GroupName}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               FontFamily="Segoe WP"
+                               Foreground="White"
+                               CharacterSpacing="100"/>
+                            </Border>
+                        </DataTemplate>
+                    </GroupStyle.HeaderTemplate>
+                </GroupStyle>
+            </ListView.GroupStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Grid Background="#FF161B22" MinHeight="68">
+                    <Grid MinHeight="68">
+                        <Grid.Background>
+                            <SolidColorBrush Color="#FF161B22"
+                         Opacity="{Binding BackgroundAlpha,
+                                           Converter={StaticResource ByteToOpacityConverter}}"/>
+                        </Grid.Background>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="56"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
+                        
 
                         <!-- Левая полоска акцентного цвета -->
                         <Rectangle Grid.Column="0"
@@ -129,7 +153,7 @@
 
                         <!-- Счётчик непрочитанных -->
                         <Border Grid.Column="2"
-                                Background="#FF0078D7"
+                                Background="{StaticResource PhoneAccentBrush}"
                                 MinWidth="26"
                                 Height="26"
                                 Margin="0,0,8,0"
@@ -166,7 +190,7 @@
                 VerticalAlignment="Bottom">
             <StackPanel>
                 <!-- Заголовок панели -->
-                <Border Background="#FF0078D7" Padding="16,12,16,12">
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,12,16,12">
                     <TextBlock Text="Выберите статус"
                                FontSize="16"
                                FontWeight="SemiBold"
@@ -237,5 +261,10 @@
                 </Button>
             </StackPanel>
         </Border>
+        <!-- В конце Grid, невидимый элемент -->
+        <MediaElement x:Name="SoundPlayer" 
+              AutoPlay="False" 
+              Volume="1.0"
+              Width="0" Height="0"/>
     </Grid>
 </Page>

@@ -9,7 +9,7 @@
     Background="#FF0D1117">
 
     <Page.BottomAppBar>
-        <CommandBar IsSticky="True" Background="#FF0078D7">
+        <CommandBar IsSticky="True" Background="{StaticResource PhoneAccentBrush}">
             <AppBarButton Icon="Permissions" Label="Войти" Click="LoginButton_Click" Foreground="White"/>
             <AppBarButton Icon="Edit" Label="Регистр." Click="RegButton_Click" Foreground="White"/>
             <CommandBar.SecondaryCommands>
@@ -58,7 +58,7 @@
                          PlaceholderText="Введите UIN"
                          Background="White"
                          Foreground="Black"
-                         BorderBrush="#FF0078D7"
+                         BorderBrush="{StaticResource PhoneAccentBrush}"
                          BorderThickness="0,0,0,2"
                          FontSize="18"
                          FontFamily="Segoe WP"
@@ -76,7 +76,7 @@
                              PlaceholderText="Введите пароль"
                              Background="White"
                              Foreground="Black"
-                             BorderBrush="#FF0078D7"
+                             BorderBrush="{StaticResource PhoneAccentBrush}"
                              BorderThickness="0,0,0,2"
                              FontSize="18"
                              FontFamily="Segoe WP"
@@ -93,7 +93,7 @@
                           SelectedIndex="0"
                           Background="#FF1A1A2E"
                           Foreground="White"
-                          BorderBrush="#FF0078D7"
+                          BorderBrush="{StaticResource PhoneAccentBrush}"
                           BorderThickness="0,0,0,2"
                           FontSize="16"
                           FontFamily="Segoe WP"
@@ -123,7 +123,7 @@
                 Background="#CC000000"
                 Visibility="Collapsed">
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-                <ProgressRing IsActive="True" Width="48" Height="48" Foreground="#FF0078D7"/>
+                <ProgressRing IsActive="True" Width="48" Height="48" Foreground="{StaticResource PhoneAccentBrush}"/>
                 <TextBlock x:Name="StatusTextBlock"
                            Text="Подключение..."
                            Foreground="White"

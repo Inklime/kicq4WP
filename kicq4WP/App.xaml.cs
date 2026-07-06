@@ -11,14 +11,18 @@ namespace kicq4WP
     {
         public OscarProtocol Oscar { get; set; }
         public ReconnectService ReconnectService { get; set; }
+        public byte ContactAlpha { get; set; } = 255;
+        public static MediaElement SoundPlayer { get; private set; }
 
         public App()
         {
             this.InitializeComponent();
             this.Suspending += OnSuspending;
 
+
         }
         public OscarProtocol CurrentOscarProtocol { get; set; }
+
 
         protected override void OnLaunched(LaunchActivatedEventArgs e)
         {
@@ -26,21 +30,28 @@ namespace kicq4WP
 
             if (rootFrame == null)
             {
+                // Оборачиваем Frame в Grid чтобы добавить MediaElement
+                var rootGrid = new Grid();
                 rootFrame = new Frame();
-                rootFrame.NavigationFailed += OnNavigationFailed;
-                Window.Current.Content = rootFrame;
-            }
+                rootGrid.Children.Add(rootFrame);
 
-            if (e.PreviousExecutionState == ApplicationExecutionState.Terminated)
+                // Добавляем MediaElement в Grid
+
+
+                Window.Current.Content = rootGrid;
+            }
+            else
             {
-                // TODO: Load state from previously suspended application
+                // Если уже инициализировано — ищем существующий SoundPlayer
+                var rootGrid = Window.Current.Content as Grid;
+                if (rootGrid != null && SoundPlayer == null)
+                {
+                    
+                }
             }
 
             if (rootFrame.Content == null)
-            {
-                // Изменено с MainPage на LoginPage
                 rootFrame.Navigate(typeof(LoginPage), e.Arguments);
-            }
 
             Window.Current.Activate();
         }
@@ -52,9 +63,8 @@ namespace kicq4WP
 
         private void OnSuspending(object sender, SuspendingEventArgs e)
         {
-            var deferral = e.SuspendingOperation.GetDeferral();
-            // TODO: Save application state
-            deferral.Complete();
+            if (ReconnectService != null)
+                ReconnectService.Stop();
         }
     }
 }

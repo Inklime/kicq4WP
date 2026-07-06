@@ -20,6 +20,8 @@ namespace kicq4WP
         private bool _running = false;
         public event Action OnDisconnected;
         public event Action OnReconnecting;
+        private volatile bool _kicked = false;
+        public event Action<string> KickedOut;
 
         // Событие — подписываемся в App чтобы обновить UI после реконнекта
         public event Action<OscarProtocol> Reconnected;
@@ -36,6 +38,7 @@ namespace kicq4WP
         public void Start(OscarProtocol oscar)
         {
             _oscar = oscar;
+            _oscar.DisconnectedByServer += OnKickedByServer;
             _running = true;
             _cts = new CancellationTokenSource();
             Task.Run(() => MonitorLoopAsync(_cts.Token));
@@ -43,8 +46,20 @@ namespace kicq4WP
 
         public void Stop()
         {
+            Debug.WriteLine("[Reconnect] Stopping...");
             _running = false;
-            if (_cts != null) _cts.Cancel();
+            if (_cts != null)
+            {
+                _cts.Cancel();
+                _cts = null;
+            }
+            Debug.WriteLine("[Reconnect] Stopped.");
+        }
+
+        private void OnKickedByServer(string reason)
+        {
+            _kicked = true;
+            KickedOut?.Invoke(reason);
         }
 
         private async Task MonitorLoopAsync(CancellationToken token)
@@ -62,9 +77,17 @@ namespace kicq4WP
                 {
                     break;
                 }
+
                 catch (Exception ex)
                 {
                     Debug.WriteLine("[Reconnect] Disconnected: " + ex.Message);
+                }
+
+                if (_kicked)
+                {
+                    Debug.WriteLine("[Reconnect] Не переподключаемся — сервер разорвал сессию (другой вход)");
+                    _running = false;
+                    break;
                 }
 
                 if (!_running || token.IsCancellationRequested) break;
@@ -92,6 +115,21 @@ namespace kicq4WP
             }
 
             Debug.WriteLine("[Reconnect] Monitor stopped");
+        }
+
+        public async Task ForceReconnectAsync()
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    bool ok = await _oscar.AuthenticateAndInitializeAsync(_uin, _statusCode);
+                    if (ok) return;
+                }
+                catch { }
+                await Task.Delay(TimeSpan.FromSeconds(2 * (attempt + 1)));
+            }
+            // Только тут — на LoginPage
         }
 
         private async Task<bool> TryReconnectAsync(CancellationToken token)

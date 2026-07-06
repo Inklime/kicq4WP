@@ -1,1 +1,1 @@
-C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\kicq4WP.csproj;neutral
+C:\Users\123\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\kicq4WP.csproj;neutral

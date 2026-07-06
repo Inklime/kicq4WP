@@ -40,8 +40,6 @@ namespace kicq4WP
         /// <summary>Вызывается когда пришло новое сообщение</summary>
         public async Task OnMessageReceived(string senderUin, string senderName, string text, CoreDispatcher dispatcher)
         {
-            // Звук — всегда
-            PlaySound(dispatcher);
 
             // Если чат с этим контактом открыт — не считаем непрочитанным
             if (ActiveChatUin == senderUin) return;

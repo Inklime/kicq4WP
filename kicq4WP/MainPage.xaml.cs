@@ -10,13 +10,18 @@ using System.Diagnostics;
 using Windows.Storage;
 using kicq4WP;
 using System.Linq;
+using Windows.UI.Core;
 
 namespace kicq4WP
 {
+
+
     public sealed partial class MainPage : Page
     {
         private OscarProtocol _oscarProtocol;
         private Task _;
+        private bool _showGroups = false;
+        private bool _hideOffline = false;
 
 
         public ObservableCollection<Contact> Contacts { get; set; }
@@ -78,6 +83,7 @@ namespace kicq4WP
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
+            SoundService.SetPlayer(SoundPlayer, Dispatcher);
 
             if (!_initialized)
             {
@@ -89,20 +95,40 @@ namespace kicq4WP
 
                 SaveLastUin(_oscarProtocol.UIN);
                 UinTextBlock.Text = _oscarProtocol.UIN;
+               // UpdateOwnStatusIcon(0x10010000);
 
-                // Подписываемся на реконнект
                 var reconnect = ((App)Application.Current).ReconnectService;
                 if (reconnect != null)
                 {
                     reconnect.OnDisconnected += OnConnectionLost;
                     reconnect.Reconnected += OnReconnected;
                 }
-
-                _oscarProtocol.ContactStatusChanged += OnContactStatusChanged;
-
+                _oscarProtocol.ContactStatusChanged += () =>
+                {
+                    ApplySettings();
+                };
+                reconnect.KickedOut += OnKickedOut;
                 NotificationService.Instance.UnreadChanged += OnUnreadChanged;
                 LoadContacts(0x00000000);
             }
+            else
+            {
+                // Возврат с другой страницы (настройки, чат) — применяем настройки
+                ApplySettings();
+            }
+        }
+
+        private async void OnKickedOut(string reason)
+        {
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, async () =>
+            {
+                await new Windows.UI.Popups.MessageDialog(
+                    reason, "Отключен").ShowAsync();
+
+                ((App)Application.Current).ReconnectService = null;
+                ((App)Application.Current).Oscar = null;
+                Frame.Navigate(typeof(LoginPage));
+            });
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -116,7 +142,7 @@ namespace kicq4WP
                 reconnect.OnDisconnected -= OnConnectionLost;
                 reconnect.Reconnected -= OnReconnected;
             }
-            _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged;
+            try { _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged; } catch { }
         }
 
         private async void OnContactStatusChanged()
@@ -124,6 +150,7 @@ namespace kicq4WP
             await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
             {
                 SortContacts();
+                RefreshView();
             });
         }
 
@@ -239,6 +266,7 @@ namespace kicq4WP
                 foreach (var contact in parsedContacts)
                     Contacts.Add(contact);
                 SortContacts();
+                ApplySettings();
             }
             catch (Exception ex)
             {
@@ -305,15 +333,51 @@ namespace kicq4WP
 
         private async void LogoutButton_Click(object sender, RoutedEventArgs e)
         {
-            var proto = ((App)Application.Current).CurrentOscarProtocol;
-
-            if (proto != null)
+            try
             {
-                await proto.DisconnectAsync();
-                ((App)Application.Current).CurrentOscarProtocol = null;
-            }
+                // 1. Останавливаем ReconnectService
+                var reconnect = ((App)Application.Current).ReconnectService;
+                if (reconnect != null)
+                {
+                    reconnect.Stop();
+                    ((App)Application.Current).ReconnectService = null;
+                }
 
-            Frame.Navigate(typeof(LoginPage));
+                // 2. Отписываемся от событий
+                if (_oscarProtocol != null)
+                {
+                    try { _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged; } catch { }
+                    try { NotificationService.Instance.UnreadChanged -= OnUnreadChanged; } catch { }
+                }
+
+                // 3. Статус офлайн
+                if (_oscarProtocol != null)
+                {
+                    try
+                    {
+                        await _oscarProtocol.SendSetStatusAsync(0xFFFFFFFF);
+                        await Task.Delay(200);
+                    }
+                    catch { }
+                }
+
+                // 4. Отключаемся
+                if (_oscarProtocol != null)
+                {
+                    await _oscarProtocol.DisconnectAsync();
+                    ((App)Application.Current).Oscar = null;
+                    _oscarProtocol = null;
+                }
+
+                Contacts.Clear();
+                _initialized = false;
+                Frame.Navigate(typeof(LoginPage));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[Logout ERROR] " + ex.Message);
+                Frame.Navigate(typeof(LoginPage));
+            }
         }
 
         private async void StartFlashingArrows(Contact contact)
@@ -341,6 +405,119 @@ namespace kicq4WP
             contact.IsNewOnline = false;
         }
 
+        public async void ApplySettings()
+        {
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            {
+                var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+
+                object showGroups = settings.Values["ShowGroups"];
+                _showGroups = showGroups != null && (bool)showGroups;
+
+                object hideOffline = settings.Values["HideOffline"];
+                _hideOffline = hideOffline != null && (bool)hideOffline;
+
+                string bgPath = settings.Values["BackgroundPath"] as string;
+                object opacityObj = settings.Values["BackgroundOpacity"];
+                double opacity = opacityObj != null ? (double)opacityObj : 100.0;
+
+                await ApplyBackground(bgPath, opacity);
+
+                object contactOpacityObj = settings.Values["ContactOpacity"];
+                double contactOpacity = contactOpacityObj != null ? (double)contactOpacityObj : 100.0;
+                byte alpha = (byte)(contactOpacity / 100.0 * 255);
+                ((App)Application.Current).ContactAlpha = alpha;
+                foreach (var c in Contacts) c.NotifyBackgroundChanged();
+
+                RefreshView();
+            });
+            
+        }
+
+
+
+        private async System.Threading.Tasks.Task ApplyBackground(
+            string path, double opacityPercent)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                // Стандартный фон
+                ContactsListView.Background =
+                    new Windows.UI.Xaml.Media.SolidColorBrush(
+                        Windows.UI.Colors.Transparent);
+                return;
+            }
+
+            try
+            {
+                var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(path);
+                using (var stream = await file.OpenReadAsync())
+                {
+                    var bitmap = new Windows.UI.Xaml.Media.Imaging.BitmapImage();
+                    await bitmap.SetSourceAsync(stream);
+
+                    byte alpha = (byte)(opacityPercent / 100.0 * 255);
+                    ContactsListView.Background = new Windows.UI.Xaml.Media.ImageBrush
+                    {
+                        ImageSource = bitmap,
+                        Stretch = Windows.UI.Xaml.Media.Stretch.UniformToFill,
+                        Opacity = opacityPercent / 100.0
+                    };
+                }
+                Debug.WriteLine("[MainPage] Background applied");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[MainPage] ApplyBackground error: " + ex.Message);
+            }
+        }
+
+        // ── Плоский список (без групп) ───────────────────────────────────────
+        // ── Единая точка перерисовки списка: применяет и группировку, и фильтр "скрыть офлайн" ──
+        private void RefreshView()
+        {
+            IEnumerable<Contact> filtered = _hideOffline
+                ? Contacts.Where(c => c.StatusIcon != null && !c.StatusIcon.Contains("offline"))
+                : Contacts;
+
+            if (_showGroups)
+            {
+                var grouped = new Dictionary<string, ObservableCollection<Contact>>();
+
+                foreach (var contact in filtered)
+                {
+                    string groupName = !string.IsNullOrEmpty(contact.Group) ? contact.Group : "Без группы";
+                    if (!grouped.ContainsKey(groupName))
+                        grouped[groupName] = new ObservableCollection<Contact>();
+                    grouped[groupName].Add(contact);
+                }
+
+                var cvs = new Windows.UI.Xaml.Data.CollectionViewSource { IsSourceGrouped = true };
+                var groupList = new ObservableCollection<ContactGroup>();
+                foreach (var kvp in grouped)
+                    groupList.Add(new ContactGroup(kvp.Key, kvp.Value));
+
+                cvs.Source = groupList;
+                ContactsListView.ItemsSource = cvs.View;
+            }
+            else
+            {
+                ContactsListView.ItemsSource = new ObservableCollection<Contact>(filtered);
+            }
+        }
+
+        // ── Настройки кнопка ────────────────────────────────────────────────
+        // Замени существующий SettingsButton_Click:
+        private void SettingsButton_Click(object sender, RoutedEventArgs e)
+        {
+            Frame.Navigate(typeof(SettingsPage));
+        }
+
+        // ── OnNavigatedTo — добавь вызов ApplySettings после LoadContacts ───
+        // В конце блока if (!_initialized):
+        // ApplySettings();
+
+        // ── При возврате со SettingsPage ─────────────────────────────────────
 
 
         private async void StatusComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -375,10 +552,6 @@ namespace kicq4WP
             await ShowErrorDialog("В разработке");
         }
 
-        private async void SettingsButton_Click(object sender, RoutedEventArgs e)
-        {
-            await ShowErrorDialog("В разработке");
-        }
 
         private void SearchButton_Click(object sender, RoutedEventArgs e)
         {

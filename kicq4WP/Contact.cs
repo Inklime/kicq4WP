@@ -1,4 +1,5 @@
-﻿using System;
+﻿using kicq4WP;
+using System;
 using System.ComponentModel;
 using System.Runtime.Serialization;
 
@@ -68,6 +69,16 @@ public class Contact : INotifyPropertyChanged
     public bool HasUnread
     {
         get { return _unreadCount > 0; }
+    }
+
+    public void NotifyBackgroundChanged()
+    {
+        OnPropertyChanged("BackgroundAlpha");
+    }
+
+    public byte BackgroundAlpha
+    {
+        get { return ((App)Windows.UI.Xaml.Application.Current).ContactAlpha; }
     }
 
     public override string ToString()

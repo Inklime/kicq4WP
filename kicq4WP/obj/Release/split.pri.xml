@@ -40,6 +40,11 @@
 					<Value>SearchPage.xbf</Value>
 				</Candidate>
 			</NamedResource>
+			<NamedResource name="Settingspage.xbf" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Settingspage.xbf">
+				<Candidate type="Path">
+					<Value>Settingspage.xbf</Value>
+				</Candidate>
+			</NamedResource>
 			<ResourceMapSubtree name="Assets">
 				<NamedResource name="desc.txt" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/desc.txt">
 					<Candidate type="Path">
@@ -59,11 +64,6 @@
 				<NamedResource name="MedLogo.png" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/MedLogo.png">
 					<Candidate type="Path">
 						<Value>Assets\MedLogo.png</Value>
-					</Candidate>
-				</NamedResource>
-				<NamedResource name="message.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/message.wav">
-					<Candidate type="Path">
-						<Value>Assets\message.wav</Value>
 					</Candidate>
 				</NamedResource>
 				<NamedResource name="SmallLogo.png" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/SmallLogo.png">
@@ -103,45 +103,45 @@
 						</Candidate>
 					</NamedResource>
 				</ResourceMapSubtree>
-				<ResourceMapSubtree name="sounds">
-					<NamedResource name="sndAuth.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndAuth.wav">
+				<ResourceMapSubtree name="Sounds">
+					<NamedResource name="auth.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/auth.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndAuth.wav</Value>
+							<Value>Assets\Sounds\auth.wav</Value>
 						</Candidate>
 					</NamedResource>
-					<NamedResource name="sndGlobal.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndGlobal.wav">
+					<NamedResource name="error.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/error.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndGlobal.wav</Value>
+							<Value>Assets\Sounds\error.wav</Value>
 						</Candidate>
 					</NamedResource>
-					<NamedResource name="sndMsgSent.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndMsgSent.wav">
+					<NamedResource name="message.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/message.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndMsgSent.wav</Value>
+							<Value>Assets\Sounds\message.wav</Value>
 						</Candidate>
 					</NamedResource>
-					<NamedResource name="sndPlugin.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndPlugin.wav">
+					<NamedResource name="notification.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/notification.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndPlugin.wav</Value>
+							<Value>Assets\Sounds\notification.wav</Value>
 						</Candidate>
 					</NamedResource>
-					<NamedResource name="sndRemSelf.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndRemSelf.wav">
+					<NamedResource name="online.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/online.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndRemSelf.wav</Value>
+							<Value>Assets\Sounds\online.wav</Value>
 						</Candidate>
 					</NamedResource>
-					<NamedResource name="sndSrvMsg.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndSrvMsg.wav">
+					<NamedResource name="sndMsgSent.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/sndMsgSent.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndSrvMsg.wav</Value>
+							<Value>Assets\Sounds\sndMsgSent.wav</Value>
 						</Candidate>
 					</NamedResource>
-					<NamedResource name="sndStartup.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndStartup.wav">
+					<NamedResource name="sndRemSelf.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/sndRemSelf.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndStartup.wav</Value>
+							<Value>Assets\Sounds\sndRemSelf.wav</Value>
 						</Candidate>
 					</NamedResource>
-					<NamedResource name="sndSystem.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/sounds/sndSystem.wav">
+					<NamedResource name="sndSystem.wav" uri="ms-resource://943be6ba-6935-43cb-9a3c-a8292fd4fadb/Files/Assets/Sounds/sndSystem.wav">
 						<Candidate type="Path">
-							<Value>Assets\sounds\sndSystem.wav</Value>
+							<Value>Assets\Sounds\sndSystem.wav</Value>
 						</Candidate>
 					</NamedResource>
 				</ResourceMapSubtree>

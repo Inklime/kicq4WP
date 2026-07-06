@@ -1,1 +1,1 @@
-C:\Users\Gregory\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\AppPackages\kicq4WP_1.1.0.1_Test\kicq4WP_1.1.0.1_AnyCPU.appxbundle
+C:\Users\123\Documents\Visual Studio 2015\Projects\kicq4WP\kicq4WP\AppPackages\kicq4WP_1.1.1.1_Test\kicq4WP_1.1.1.1_AnyCPU.appxbundle

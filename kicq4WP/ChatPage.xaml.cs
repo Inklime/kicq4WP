@@ -2,13 +2,17 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Windows.Storage;
 using Windows.System;
 using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Navigation;
+using Windows.UI.Input;
+using Windows.Phone.UI.Input;
 
 namespace kicq4WP
 {
@@ -20,21 +24,38 @@ namespace kicq4WP
         private ObservableCollection<ChatMessage> _messages = new ObservableCollection<ChatMessage>();
         private ReconnectService _reconnect;
 
+        // Сообщение, на которое сейчас отвечаем (или null)
+        private ChatMessage _replyTo;
+
         public ChatPage()
         {
             this.InitializeComponent();
             MessagesList.ItemsSource = _messages;
+            HardwareButtons.BackPressed += HardwareButtons_BackPressed;
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
 
-            var param = e.Parameter as Tuple<Contact, OscarProtocol>;
-            if (param == null) return;
+            string forwardText = null;
 
-            _contact = param.Item1;
-            _oscar = param.Item2;
+            // Вариант навигации: (Contact, OscarProtocol, textToForward) — пришли из пересылки
+            var paramWithForward = e.Parameter as Tuple<Contact, OscarProtocol, string>;
+            if (paramWithForward != null)
+            {
+                _contact = paramWithForward.Item1;
+                _oscar = paramWithForward.Item2;
+                forwardText = paramWithForward.Item3;
+            }
+            else
+            {
+                // Обычный вариант: (Contact, OscarProtocol)
+                var param = e.Parameter as Tuple<Contact, OscarProtocol>;
+                if (param == null) return;
+                _contact = param.Item1;
+                _oscar = param.Item2;
+            }
 
             ContactNameTextBlock.Text = _contact.Name;
             ContactUinTextBlock.Text = _contact.Uin;
@@ -59,12 +80,11 @@ namespace kicq4WP
 
             // Загружаем историю
             await LoadHistoryAsync();
-
+            await ApplyChatBackground();
             // Добавляем сообщения которые пришли пока чат был закрыт
             var pending = _oscar.GetAndClearPending(_contact.Uin);
             foreach (var msg in pending)
             {
-                // Проверяем что их ещё нет в истории (по тексту и времени)
                 var chatMsg = new ChatMessage();
                 chatMsg.Text = msg[0];
                 chatMsg.SenderName = _contact.Name;
@@ -77,11 +97,29 @@ namespace kicq4WP
 
             ScrollToBottom();
             _oscar.IncomingMessage += OnIncomingMessage;
+
+            // Если пришли из "Переслать" — подставляем текст в поле ввода
+            if (!string.IsNullOrEmpty(forwardText))
+            {
+                MessageTextBox.Text = forwardText;
+                MessageTextBox.SelectionStart = forwardText.Length;
+                MessageTextBox.Focus(FocusState.Programmatic);
+            }
+        }
+
+        private void HardwareButtons_BackPressed(object sender, BackPressedEventArgs e)
+        {
+            if (Frame.CanGoBack)
+            {
+                e.Handled = true;
+                Frame.GoBack();
+            }
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
+            HardwareButtons.BackPressed -= HardwareButtons_BackPressed;
             NotificationService.Instance.ActiveChatUin = null;
             if (_reconnect != null)
             {
@@ -96,7 +134,7 @@ namespace kicq4WP
         {
             if (senderUin != _contact.Uin) return;
 
-#pragma warning disable CS1998 // В асинхронном методе отсутствуют операторы await, будет выполнен синхронный метод
+#pragma warning disable CS1998
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
                 var msg = new ChatMessage();
@@ -107,13 +145,38 @@ namespace kicq4WP
                 msg.IsOutgoing = false;
                 _messages.Add(msg);
 
-                // Сохраняем не блокируя UI
                 var saveTask = SaveMessageAsync(msg);
 
-                // Скролл только если уже внизу
                 ScrollToBottomIfNeeded();
             });
-#pragma warning restore CS1998 // В асинхронном методе отсутствуют операторы await, будет выполнен синхронный метод
+#pragma warning restore CS1998
+        }
+
+        private async Task ApplyChatBackground()
+        {
+            var settings = ApplicationData.Current.LocalSettings;
+            string path = settings.Values["ChatBackgroundPath"] as string;
+            if (string.IsNullOrEmpty(path)) return;
+
+            try
+            {
+                var file = await StorageFile.GetFileFromPathAsync(path);
+                using (var stream = await file.OpenReadAsync())
+                {
+                    var bitmap = new Windows.UI.Xaml.Media.Imaging.BitmapImage();
+                    await bitmap.SetSourceAsync(stream);
+                    MessagesList.Background = new Windows.UI.Xaml.Media.ImageBrush
+                    {
+                        ImageSource = bitmap,
+                        Stretch = Windows.UI.Xaml.Media.Stretch.UniformToFill,
+                        Opacity = 0.3
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ChatPage] ApplyChatBackground error: " + ex.Message);
+            }
         }
 
         private void ScrollToBottom()
@@ -126,8 +189,6 @@ namespace kicq4WP
 
         private void ScrollToBottomIfNeeded()
         {
-            // Скролл только если пользователь уже внизу списка
-            // (чтобы не прыгать если он читает старые сообщения)
             ScrollToBottom();
         }
 
@@ -151,14 +212,24 @@ namespace kicq4WP
             if (text != null) text = text.Trim();
             if (string.IsNullOrEmpty(text) || _oscar == null) return;
 
+            string finalText = text;
+            if (_replyTo != null)
+            {
+                string quotedLines = string.Join("\n",
+                    _replyTo.Text.Split('\n').Select(l => "> " + l));
+                finalText = quotedLines + "\n\n" + text;
+            }
+
             MessageTextBox.Text = "";
+            _replyTo = null;
+            ReplyPreviewPanel.Visibility = Visibility.Collapsed;
 
             try
             {
-                await _oscar.SendIcbmAsync(_contact.Uin, text);
+                await _oscar.SendIcbmAsync(_contact.Uin, finalText);
 
                 var msg = new ChatMessage();
-                msg.Text = text;
+                msg.Text = finalText;
                 msg.SenderName = "Вы";
                 msg.Time = DateTime.Now.ToString("HH:mm");
                 msg.IsIncoming = false;
@@ -186,15 +257,175 @@ namespace kicq4WP
             ContactUinTextBlock.Text = _contact.Uin;
         }
 
+        // ================== Долгое нажатие на сообщение ==================
+
+        private void MessageBorder_Holding(object sender, HoldingRoutedEventArgs e)
+        {
+            if (e.HoldingState != HoldingState.Started) return;
+
+            var element = sender as FrameworkElement;
+            var msg = element?.DataContext as ChatMessage;
+            if (msg == null) return;
+
+            var flyout = new MenuFlyout();
+
+            var reply = new MenuFlyoutItem { Text = "Ответить" };
+            reply.Click += (s, a) => StartReply(msg);
+            flyout.Items.Add(reply);
+
+            var forward = new MenuFlyoutItem { Text = "Переслать" };
+            forward.Click += (s, a) => ForwardMessage(msg);
+            flyout.Items.Add(forward);
+
+            var copy = new MenuFlyoutItem { Text = "Копировать" };
+            copy.Click += (s, a) => CopyMessageText(msg);
+            flyout.Items.Add(copy);
+
+            flyout.ShowAt(element);
+        }
+
+        // ---- Ответить ----
+
+        private void StartReply(ChatMessage msg)
+        {
+            _replyTo = msg;
+            string preview = msg.Text.Length > 60 ? msg.Text.Substring(0, 60) + "…" : msg.Text;
+            ReplyPreviewText.Text = "Ответ на: " + preview;
+            ReplyPreviewPanel.Visibility = Visibility.Visible;
+            MessageTextBox.Focus(FocusState.Programmatic);
+        }
+
+        private void CancelReply_Click(object sender, RoutedEventArgs e)
+        {
+            _replyTo = null;
+            ReplyPreviewPanel.Visibility = Visibility.Collapsed;
+        }
+
+        // ---- Переслать ----
+
+        private async void ForwardMessage(ChatMessage msg)
+        {
+            await ShowForwardContactPicker(msg.Text);
+        }
+
+        // Popup со списком контактов для пересылки. Не требует перехода на
+        // MainPage/ContactsPage и её собственной инициализации — контакты
+        // берутся напрямую из уже подключённого _oscar.
+        //
+        // ВАЖНО: строка "_oscar.ContactList" — предположение об имени свойства
+        // со списком контактов. Если у вас он называется иначе — замените
+        // только эту строку.
+        private async Task ShowForwardContactPicker(string textToForward)
+        {
+            var contacts = await _oscar.GetContactsAsync(0);
+            if (contacts == null || contacts.Count == 0)
+            {
+                await new Windows.UI.Popups.MessageDialog(
+                    "Список контактов пуст или недоступен.", "Переслать").ShowAsync();
+                return;
+            }
+
+            var popup = new Windows.UI.Xaml.Controls.Primitives.Popup();
+
+            double screenWidth = Window.Current.Bounds.Width;
+            double screenHeight = Window.Current.Bounds.Height;
+            var margin = new Thickness(20, 40, 20, 40);
+
+            var root = new Grid
+            {
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 13, 17, 23)),
+                Width = screenWidth - margin.Left - margin.Right,
+                Height = screenHeight - margin.Top - margin.Bottom,
+                Margin = margin
+            };
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var title = new TextBlock
+            {
+                Text = "Переслать кому?",
+                FontSize = 18,
+                FontFamily = new Windows.UI.Xaml.Media.FontFamily("Segoe WP"),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White),
+                Margin = new Thickness(16, 12, 16, 8)
+            };
+            Grid.SetRow(title, 0);
+            root.Children.Add(title);
+
+            var listBox = new ListBox
+            {
+                ItemsSource = contacts,
+                DisplayMemberPath = "Name",
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.Transparent),
+                Margin = new Thickness(8, 0, 8, 0)
+            };
+            var itemStyle = new Style(typeof(ListBoxItem));
+            itemStyle.Setters.Add(new Setter(ListBoxItem.ForegroundProperty,
+                new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White)));
+            itemStyle.Setters.Add(new Setter(ListBoxItem.FontSizeProperty, 18.0));
+            itemStyle.Setters.Add(new Setter(ListBoxItem.PaddingProperty, new Thickness(8, 10, 8, 10)));
+            listBox.ItemContainerStyle = itemStyle;
+            Grid.SetRow(listBox, 1);
+            root.Children.Add(listBox);
+
+            var cancelBtn = new Button
+            {
+                Content = "Отмена",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 40, 40, 40)),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White),
+                FontSize = 17,
+                FontFamily = new Windows.UI.Xaml.Media.FontFamily("Segoe WP"),
+                Margin = new Thickness(8, 8, 8, 8)
+            };
+            Grid.SetRow(cancelBtn, 2);
+            root.Children.Add(cancelBtn);
+
+            popup.Child = root;
+            popup.HorizontalOffset = 0;
+            popup.VerticalOffset = margin.Top;
+
+            var tcs = new TaskCompletionSource<Contact>();
+
+            SelectionChangedEventHandler onSelected = null;
+            onSelected = (s, a) =>
+            {
+                var selected = listBox.SelectedItem as Contact;
+                if (selected == null) return;
+                listBox.SelectionChanged -= onSelected;
+                popup.IsOpen = false;
+                tcs.TrySetResult(selected);
+            };
+            listBox.SelectionChanged += onSelected;
+
+            cancelBtn.Click += (s, a) =>
+            {
+                listBox.SelectionChanged -= onSelected;
+                popup.IsOpen = false;
+                tcs.TrySetResult(null);
+            };
+
+            popup.IsOpen = true;
+
+            var chosen = await tcs.Task;
+            if (chosen != null)
+            {
+                Frame.Navigate(typeof(ChatPage), Tuple.Create(chosen, _oscar, textToForward));
+            }
+        }
+
+        // ---- Копировать ----
+
+        private void CopyMessageText(ChatMessage msg)
+        {
+
+        }
+
         private void CopyUin_Click(object sender, RoutedEventArgs e)
         {
-            // WP8.1 использует другой API для буфера обмена
-            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            dp.SetText(_contact.Uin);
-            // Clipboard недоступен в WP8.1 — используем share
-            // Просто показываем UIN чтобы пользователь мог скопировать вручную
-            var ignored = new Windows.UI.Popups.MessageDialog(
-                _contact.Uin, "UIN контакта").ShowAsync();
         }
 
         private async void ContactInfo_Click(object sender, RoutedEventArgs e)
@@ -264,16 +495,24 @@ namespace kicq4WP
         }
 
         // Универсальный popup переименования
+        // ИСПРАВЛЕНО: раньше Width = полная ширина экрана + Margin по бокам => попап
+        // "уезжал" за правый край. Теперь ширина панели уменьшена на величину
+        // горизонтальных margin'ов, чтобы итоговая занимаемая область была ровно
+        // по ширине экрана и центрировалась симметрично.
         private async Task ShowRenamePopup(Contact contact, Func<string, Task> onSave)
         {
             var popup = new Windows.UI.Xaml.Controls.Primitives.Popup();
+
+            double screenWidth = Window.Current.Bounds.Width;
+            var margin = new Thickness(20, 16, 20, 16);
 
             var panel = new StackPanel
             {
                 Background = new Windows.UI.Xaml.Media.SolidColorBrush(
                     Windows.UI.Color.FromArgb(255, 13, 17, 23)),
-                Width = Window.Current.Bounds.Width,
-                Margin = new Thickness(20, 16, 20, 16)
+                Width = screenWidth - margin.Left - margin.Right,
+                Margin = margin,
+                HorizontalAlignment = HorizontalAlignment.Left
             };
 
             panel.Children.Add(new TextBlock
@@ -324,6 +563,8 @@ namespace kicq4WP
             panel.Children.Add(btnCancel);
 
             popup.Child = panel;
+            // HorizontalOffset явно оставляем 0 — вся коррекция сделана через ширину панели.
+            popup.HorizontalOffset = 0;
             popup.VerticalOffset = Window.Current.Bounds.Height - 300;
 
             var tcs = new TaskCompletionSource<bool>();
@@ -443,8 +684,6 @@ namespace kicq4WP
             }
             catch { }
         }
-
-
 
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {

@@ -1,0 +1,289 @@
+﻿<Page
+    x:Class="kicq4WP.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="#FF0D1117">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Шапка -->
+        <Border Grid.Row="0" Background="{StaticResource PhoneAccentBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="56"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button x:ConnectionId='9' Grid.Column="0"                         
+                        Background="Transparent" BorderThickness="0"
+                        Width="56" Height="56" Padding="0">
+                    <TextBlock Text="         " FontFamily="Segoe UI Symbol" FontSize="28" FontWeight="Light"
+                               Foreground="White" VerticalAlignment="Center"
+                               HorizontalAlignment="Center" Width="217"/>
+                </Button>
+                <TextBlock Grid.Column="1" Text="Настройки"
+                           FontSize="20" FontFamily="Segoe WP"
+                           FontWeight="SemiBold" Foreground="White"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0">
+
+                <!-- Секция: Список контактов -->
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10" Margin="0,0,0,1">
+                    <TextBlock Text="СПИСОК КОНТАКТОВ"
+                               FontSize="13" FontFamily="Segoe WP"
+                               FontWeight="SemiBold" Foreground="White"
+                               CharacterSpacing="150"/>
+                </Border>
+
+                <!-- Показывать группы -->
+                <Border Background="#FF161B22" Padding="16,0,16,0" Margin="0,0,0,1">
+                    <Grid MinHeight="56">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Показывать группы"
+                                       FontSize="17" FontFamily="Segoe WP"
+                                       Foreground="White"/>
+                            <TextBlock Text="Разбить контакты по группам"
+                                       FontSize="13" FontFamily="Segoe WP"
+                                       Foreground="#66FFFFFF"/>
+                        </StackPanel>
+                        <ToggleSwitch x:ConnectionId='8' x:Name="ShowGroupsToggle"
+                                      Grid.Column="1"
+                                                                        
+                                      VerticalAlignment="Center"
+                                      Margin="0,8,0,8"/>
+                    </Grid>
+                </Border>
+                <!-- Скрывать офлайн -->
+                <Border Background="#FF161B22" Padding="16,0,16,0" Margin="0,0,0,1">
+                    <Grid MinHeight="56">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Скрывать офлайн"
+                       FontSize="17" FontFamily="Segoe WP"
+                       Foreground="White"/>
+                            <TextBlock Text="Только контакты в сети"
+                       FontSize="13" FontFamily="Segoe WP"
+                       Foreground="#66FFFFFF"/>
+                        </StackPanel>
+                        <ToggleSwitch x:ConnectionId='7' x:Name="HideOfflineToggle"
+                      Grid.Column="1"
+                                                         
+                      VerticalAlignment="Center"
+                      Margin="0,8,0,8"/>
+                    </Grid>
+                </Border>
+
+                <!-- Секция: Фон -->
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10"
+                        Margin="0,16,0,1">
+                    <TextBlock Text="ФОН СПИСКА КОНТАКТОВ"
+                               FontSize="13" FontFamily="Segoe WP"
+                               FontWeight="SemiBold" Foreground="White"
+                               CharacterSpacing="150"/>
+                </Border>
+
+                <!-- Текущий фон -->
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Текущий фон"
+                                   FontSize="14" FontFamily="Segoe WP"
+                                   Foreground="#88FFFFFF" Margin="0,0,0,8"/>
+                        <Border x:Name="BackgroundPreview"
+                                Height="80" Background="#FF0D1117"
+                                Margin="0,0,0,0">
+                            <TextBlock x:Name="BackgroundPreviewText"
+                                       Text="Фон не выбран"
+                                       FontSize="14" FontFamily="Segoe WP"
+                                       Foreground="#44FFFFFF"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Выбрать фото -->
+                <Border Background="#FF161B22" Padding="0,0,0,0" Margin="0,0,0,1">
+                    <Button x:ConnectionId='6'                             
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="16,16,16,16">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE114;" FontFamily="Segoe UI Symbol"
+                                       FontSize="22" Foreground="{StaticResource PhoneAccentBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,14,0"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Выбрать изображение"
+                                           FontSize="17" FontFamily="Segoe WP"
+                                           Foreground="White"/>
+                                <TextBlock Text="Из галереи телефона"
+                                           FontSize="13" FontFamily="Segoe WP"
+                                           Foreground="#66FFFFFF"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+                </Border>
+
+                <!-- Очистить фон -->
+                <Border Background="#FF161B22" Padding="0,0,0,0" Margin="0,0,0,1">
+                    <Button x:ConnectionId='5'                              
+                            Background="Transparent"
+                            BorderThickness="0"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Padding="16,16,16,16">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE107;" FontFamily="Segoe UI Symbol"
+                                       FontSize="22" Foreground="#FFFF4444"
+                                       VerticalAlignment="Center" Margin="0,0,14,0"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Убрать фон"
+                                           FontSize="17" FontFamily="Segoe WP"
+                                           Foreground="White"/>
+                                <TextBlock Text="Вернуть стандартный тёмный фон"
+                                           FontSize="13" FontFamily="Segoe WP"
+                                           Foreground="#66FFFFFF"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+                </Border>
+
+                <!-- Прозрачность фона -->
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Прозрачность фона"
+                                       FontSize="17" FontFamily="Segoe WP"
+                                       Foreground="White" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="OpacityValueText"
+                                       Grid.Column="1" Text="100%"
+                                       FontSize="17" FontFamily="Segoe WP"
+                                       Foreground="{StaticResource PhoneAccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Slider x:ConnectionId='4' x:Name="BackgroundOpacitySlider"
+                                Minimum="10" Maximum="100" Value="100"
+                                                                         
+                                Foreground="{StaticResource PhoneAccentBrush}"/>
+                    </StackPanel>
+                </Border>
+                <!-- После секции прозрачности фона, перед "О приложении" -->
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10" Margin="0,16,0,1">
+                    <TextBlock Text="ПРОЗРАЧНОСТЬ КНОПОК КОНТАКТОВ"
+               FontSize="13" FontFamily="Segoe WP"
+               FontWeight="SemiBold" Foreground="White"
+               CharacterSpacing="150"/>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Прозрачность элементов"
+                       FontSize="17" FontFamily="Segoe WP"
+                       Foreground="White" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="ContactOpacityText"
+                       Grid.Column="1" Text="100%"
+                       FontSize="17" FontFamily="Segoe WP"
+                       Foreground="{StaticResource PhoneAccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Slider x:ConnectionId='3' x:Name="ContactOpacitySlider"
+                Minimum="0" Maximum="100" Value="100"
+                                                                
+                Foreground="{StaticResource PhoneAccentBrush}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Фон чата -->
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10" Margin="0,16,0,1">
+                    <TextBlock Text="ФОН ЧАТА" FontSize="13" FontFamily="Segoe WP"
+               FontWeight="SemiBold" Foreground="White" CharacterSpacing="150"/>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="0,0,0,0" Margin="0,0,0,1">
+                    <Button x:ConnectionId='2'                                  Background="Transparent"
+            BorderThickness="0" HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Left" Padding="16,16,16,16">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE114;" FontFamily="Segoe UI Symbol"
+                       FontSize="22" Foreground="{StaticResource PhoneAccentBrush}"
+                       VerticalAlignment="Center" Margin="0,0,14,0"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Выбрать изображение для чата"
+                           FontSize="17" FontFamily="Segoe WP" Foreground="White"/>
+                                <TextBlock Text="Фон окна переписки"
+                           FontSize="13" FontFamily="Segoe WP" Foreground="#66FFFFFF"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="0,0,0,0" Margin="0,0,0,1">
+                    <Button x:ConnectionId='1'                                   Background="Transparent"
+            BorderThickness="0" HorizontalAlignment="Stretch"
+            HorizontalContentAlignment="Left" Padding="16,16,16,16">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE107;" FontFamily="Segoe UI Symbol"
+                       FontSize="22" Foreground="#FFFF4444"
+                       VerticalAlignment="Center" Margin="0,0,14,0"/>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="Убрать фон чата"
+                           FontSize="17" FontFamily="Segoe WP" Foreground="White"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Button>
+                </Border>
+
+                <!-- Секция: О приложении -->
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10"
+                        Margin="0,16,0,1">
+                    <TextBlock Text="О ПРИЛОЖЕНИИ"
+                               FontSize="13" FontFamily="Segoe WP"
+                               FontWeight="SemiBold" Foreground="White"
+                               CharacterSpacing="150"/>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="16,16,16,16" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="kicq4WP"
+                                   FontSize="20" FontFamily="Segoe WP"
+                                   FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="ICQ клиент для Windows Phone 8.1"
+                                   FontSize="14" FontFamily="Segoe WP"
+                                   Foreground="#88FFFFFF" Margin="0,4,0,0"/>
+                        <TextBlock Text="Версия: 1.1.1.1"
+                                   FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,2,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Height="20"/>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
+
