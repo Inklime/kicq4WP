@@ -123,7 +123,7 @@
                         <Rectangle Grid.Column="0"
                                    Width="3"
                                    HorizontalAlignment="Left"
-                                   Fill="#FF0078D7"
+                                   Fill="{StaticResource PhoneAccentBrush}"
                                    Visibility="{Binding HasUnread, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
                         <!-- Статус иконка -->

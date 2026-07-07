@@ -61,7 +61,6 @@ namespace kicq4WP
             _oscarProtocol = new OscarProtocol(login, password, this.Dispatcher);
             ((App)Application.Current).Oscar = _oscarProtocol;
             _oscarProtocol.StatusUpdater = UpdateStatusText;
-            SoundService.Init(this.Dispatcher);
 
             try
             {

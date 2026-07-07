@@ -12,7 +12,6 @@ namespace kicq4WP
         public OscarProtocol Oscar { get; set; }
         public ReconnectService ReconnectService { get; set; }
         public byte ContactAlpha { get; set; } = 255;
-        public static MediaElement SoundPlayer { get; private set; }
 
         public App()
         {
@@ -30,24 +29,27 @@ namespace kicq4WP
 
             if (rootFrame == null)
             {
-                // Оборачиваем Frame в Grid чтобы добавить MediaElement
-                var rootGrid = new Grid();
                 rootFrame = new Frame();
+                rootFrame.NavigationFailed += OnNavigationFailed; // кстати, раньше это вообще нигде не подключалось
+
+                var rootGrid = new Grid();
                 rootGrid.Children.Add(rootFrame);
 
-                // Добавляем MediaElement в Grid
-
+                // Единственный MediaElement на всё приложение — живёт здесь,
+                // а не на конкретной странице, поэтому Frame.Navigate между
+                // MainPage/ChatPage/SettingsPage никогда его не выгружает.
+                var soundPlayer = new MediaElement
+                {
+                    AutoPlay = false,
+                    Volume = 1.0,
+                    Width = 0,
+                    Height = 0
+                };
+                rootGrid.Children.Add(soundPlayer);
 
                 Window.Current.Content = rootGrid;
-            }
-            else
-            {
-                // Если уже инициализировано — ищем существующий SoundPlayer
-                var rootGrid = Window.Current.Content as Grid;
-                if (rootGrid != null && SoundPlayer == null)
-                {
-                    
-                }
+
+                SoundService.SetPlayer(soundPlayer, Window.Current.Dispatcher);
             }
 
             if (rootFrame.Content == null)
@@ -61,10 +63,23 @@ namespace kicq4WP
             throw new Exception("Failed to load Page " + e.SourcePageType.FullName);
         }
 
-        private void OnSuspending(object sender, SuspendingEventArgs e)
+        private async void OnSuspending(object sender, SuspendingEventArgs e)
         {
-            if (ReconnectService != null)
-                ReconnectService.Stop();
+            var deferral = e.SuspendingOperation.GetDeferral();
+            try
+            {
+                if (ReconnectService != null)
+                    ReconnectService.Stop();
+
+                if (Oscar != null)
+                {
+                    try { await Oscar.DisconnectAsync(); } catch { }
+                }
+            }
+            finally
+            {
+                deferral.Complete();
+            }
         }
     }
 }

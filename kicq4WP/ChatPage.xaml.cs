@@ -13,6 +13,7 @@ using Windows.UI.Xaml.Input;
 using Windows.UI.Xaml.Navigation;
 using Windows.UI.Input;
 using Windows.Phone.UI.Input;
+using System.Collections.Generic;
 
 namespace kicq4WP
 {
@@ -24,6 +25,7 @@ namespace kicq4WP
         private ObservableCollection<ChatMessage> _messages = new ObservableCollection<ChatMessage>();
         private ReconnectService _reconnect;
 
+
         // Сообщение, на которое сейчас отвечаем (или null)
         private ChatMessage _replyTo;
 
@@ -32,6 +34,7 @@ namespace kicq4WP
             this.InitializeComponent();
             MessagesList.ItemsSource = _messages;
             HardwareButtons.BackPressed += HardwareButtons_BackPressed;
+            EmojiItemsControl.ItemsSource = _availableEmojis;
         }
 
         protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -78,6 +81,8 @@ namespace kicq4WP
             NotificationService.Instance.ActiveChatUin = _contact.Uin;
             NotificationService.Instance.ClearUnread(_contact.Uin);
 
+            _messages.Clear();
+
             // Загружаем историю
             await LoadHistoryAsync();
             await ApplyChatBackground();
@@ -91,6 +96,7 @@ namespace kicq4WP
                 chatMsg.Time = msg[1];
                 chatMsg.IsIncoming = true;
                 chatMsg.IsOutgoing = false;
+
                 _messages.Add(chatMsg);
                 await SaveMessageAsync(chatMsg);
             }
@@ -116,6 +122,34 @@ namespace kicq4WP
             }
         }
 
+        private void OnEmojiPicked(object sender, RoutedEventArgs e)
+        {
+            var button = sender as Button;
+            if (button != null && button.Tag != null)
+            {
+                string emojiCode = button.Tag.ToString();
+
+                int cursorPosition = MessageTextBox.SelectionStart;
+                MessageTextBox.Text = MessageTextBox.Text.Insert(cursorPosition, emojiCode);
+
+                MessageTextBox.SelectionStart = cursorPosition + emojiCode.Length;
+                MessageTextBox.Focus(FocusState.Programmatic);
+            }
+        }
+
+        private void EmojiButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (EmojiPanel.Visibility == Visibility.Visible)
+            {
+                EmojiPanel.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                EmojiPanel.Visibility = Visibility.Visible;
+            }
+        }
+
+
         protected override void OnNavigatedFrom(NavigationEventArgs e)
         {
             base.OnNavigatedFrom(e);
@@ -133,8 +167,8 @@ namespace kicq4WP
         private async void OnIncomingMessage(string senderUin, string text)
         {
             if (senderUin != _contact.Uin) return;
+            _oscar.GetAndClearPending(_contact.Uin);
 
-#pragma warning disable CS1998
             await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
                 var msg = new ChatMessage();
@@ -143,13 +177,12 @@ namespace kicq4WP
                 msg.Time = DateTime.Now.ToString("HH:mm");
                 msg.IsIncoming = true;
                 msg.IsOutgoing = false;
+
+
                 _messages.Add(msg);
-
-                var saveTask = SaveMessageAsync(msg);
-
+                await SaveMessageAsync(msg);
                 ScrollToBottomIfNeeded();
             });
-#pragma warning restore CS1998
         }
 
         private async Task ApplyChatBackground()
@@ -311,10 +344,6 @@ namespace kicq4WP
         // Popup со списком контактов для пересылки. Не требует перехода на
         // MainPage/ContactsPage и её собственной инициализации — контакты
         // берутся напрямую из уже подключённого _oscar.
-        //
-        // ВАЖНО: строка "_oscar.ContactList" — предположение об имени свойства
-        // со списком контактов. Если у вас он называется иначе — замените
-        // только эту строку.
         private async Task ShowForwardContactPicker(string textToForward)
         {
             var contacts = await _oscar.GetContactsAsync(0);
@@ -612,11 +641,11 @@ namespace kicq4WP
             }
         }
 
-        private void EmojiButton_Click(object sender, RoutedEventArgs e)
+       /*rivate void EmojiButton_Click(object sender, RoutedEventArgs e)
         {
             _emojiVisible = !_emojiVisible;
             EmojiPanel.Visibility = _emojiVisible ? Visibility.Visible : Visibility.Collapsed;
-        }
+        }*/
 
         private void InsertEmoji_Click(object sender, RoutedEventArgs e)
         {
@@ -644,8 +673,16 @@ namespace kicq4WP
         {
             try
             {
-                string dir = msg.IsOutgoing ? "OUT" : "IN";
-                string line = dir + "|" + msg.Time + "|" + msg.SenderName + "|" + msg.Text + "\n";
+                // Используем \x01 как разделитель вместо | 
+                // и \x02 как разделитель строк вместо \n
+                string text = msg.Text
+                    .Replace("\x01", " ")  // убираем спецсимволы из текста
+                    .Replace("\x02", " ");
+                string line = (msg.IsOutgoing ? "OUT" : "IN") + "\x01" +
+                              msg.Time + "\x01" +
+                              msg.SenderName + "\x01" +
+                              text + "\x02";
+
                 StorageFolder folder = ApplicationData.Current.LocalFolder;
                 StorageFile file = await folder.CreateFileAsync(
                     HistoryFileName, CreationCollisionOption.OpenIfExists);
@@ -664,11 +701,19 @@ namespace kicq4WP
                 StorageFolder folder = ApplicationData.Current.LocalFolder;
                 StorageFile file = await folder.GetFileAsync(HistoryFileName);
                 string content = await FileIO.ReadTextAsync(file);
-                string[] lines = content.Split('\n');
+
+                // Пробуем новый формат (разделитель \x02)
+                bool isNewFormat = content.Contains("\x02");
+                string[] lines = isNewFormat
+                    ? content.Split('\x02')
+                    : content.Split('\n');
+
+                char sep = isNewFormat ? '\x01' : '|';
+
                 foreach (string line in lines)
                 {
                     if (string.IsNullOrEmpty(line)) continue;
-                    string[] parts = line.Split(new char[] { '|' }, 4);
+                    string[] parts = line.Split(new char[] { sep }, 4);
                     if (parts.Length < 4) continue;
 
                     bool isOut = parts[0] == "OUT";
@@ -679,11 +724,78 @@ namespace kicq4WP
                     msg.SenderName = parts[2];
                     msg.Text = parts[3];
                     _messages.Add(msg);
+
                 }
                 ScrollToBottom();
+                // Пересохраняем в новом формате если читали старый
+                if (!isNewFormat && _messages.Count > 0)
+                {
+                    try
+                    {
+                        StorageFile newFile = await folder.CreateFileAsync(
+                            HistoryFileName, CreationCollisionOption.ReplaceExisting);
+                        var sb = new System.Text.StringBuilder();
+                        foreach (var m in _messages)
+                        {
+                            string t = (m.Text ?? "").Replace("\x01", " ").Replace("\x02", " ");
+                            sb.Append((m.IsOutgoing ? "OUT" : "IN") + "\x01" +
+                                      m.Time + "\x01" + m.SenderName + "\x01" + t + "\x02");
+                        }
+                        await FileIO.WriteTextAsync(newFile, sb.ToString());
+                        Debug.WriteLine("[History] Migrated to new format");
+                    }
+                    catch { }
+                }
             }
             catch { }
         }
+
+        private List<EmojiItem> _availableEmojis = new List<EmojiItem>
+{
+    new EmojiItem { Code = "O:-)", ImagePath = "ms-appx:///Assets/emoji/aa.gif" },
+new EmojiItem { Code = ":-)", ImagePath = "ms-appx:///Assets/emoji/ab.gif" },
+new EmojiItem { Code = ":-(", ImagePath = "ms-appx:///Assets/emoji/ac.gif" },
+new EmojiItem { Code = ";-)", ImagePath = "ms-appx:///Assets/emoji/ad.gif" },
+new EmojiItem { Code = ":-P", ImagePath = "ms-appx:///Assets/emoji/ae.gif" },
+new EmojiItem { Code = "8)", ImagePath = "ms-appx:///Assets/emoji/af.gif" },
+new EmojiItem { Code = ":-D", ImagePath = "ms-appx:///Assets/emoji/ag.gif" },
+new EmojiItem { Code = ":-[", ImagePath = "ms-appx:///Assets/emoji/ah.gif" },
+new EmojiItem { Code = "=-O", ImagePath = "ms-appx:///Assets/emoji/ai.gif" },
+new EmojiItem { Code = ":-*", ImagePath = "ms-appx:///Assets/emoji/aj.gif" },
+new EmojiItem { Code = ":'(", ImagePath = "ms-appx:///Assets/emoji/ak.gif" },
+new EmojiItem { Code = ":-X", ImagePath = "ms-appx:///Assets/emoji/al.gif" },
+new EmojiItem { Code = ">:o", ImagePath = "ms-appx:///Assets/emoji/am.gif" },
+new EmojiItem { Code = ":-|", ImagePath = "ms-appx:///Assets/emoji/an.gif" },
+new EmojiItem { Code = ":-\\", ImagePath = "ms-appx:///Assets/emoji/ao.gif" },
+new EmojiItem { Code = "*JOKINGLY*", ImagePath = "ms-appx:///Assets/emoji/ap.gif" },
+new EmojiItem { Code = "]:->", ImagePath = "ms-appx:///Assets/emoji/aq.gif" },
+new EmojiItem { Code = "[:-}", ImagePath = "ms-appx:///Assets/emoji/ar.gif" },
+new EmojiItem { Code = "*KISSED*", ImagePath = "ms-appx:///Assets/emoji/as.gif" },
+new EmojiItem { Code = ":-!", ImagePath = "ms-appx:///Assets/emoji/at.gif" },
+new EmojiItem { Code = "*TIRED*", ImagePath = "ms-appx:///Assets/emoji/au.gif" },
+new EmojiItem { Code = "*STOP*", ImagePath = "ms-appx:///Assets/emoji/av.gif" },
+new EmojiItem { Code = "*KISSING*", ImagePath = "ms-appx:///Assets/emoji/aw.gif" },
+new EmojiItem { Code = "@}->--", ImagePath = "ms-appx:///Assets/emoji/ax.gif" },
+new EmojiItem { Code = "*THUMBS UP*", ImagePath = "ms-appx:///Assets/emoji/ay.gif" },
+new EmojiItem { Code = "*DRINK*", ImagePath = "ms-appx:///Assets/emoji/az.gif" },
+new EmojiItem { Code = "*IN LOVE*", ImagePath = "ms-appx:///Assets/emoji/ba.gif" },
+new EmojiItem { Code = "@=", ImagePath = "ms-appx:///Assets/emoji/bb.gif" },
+new EmojiItem { Code = "*HELP*", ImagePath = "ms-appx:///Assets/emoji/bc.gif" },
+new EmojiItem { Code = "\\m/", ImagePath = "ms-appx:///Assets/emoji/bd.gif" },
+new EmojiItem { Code = "%)", ImagePath = "ms-appx:///Assets/emoji/be.gif" },
+new EmojiItem { Code = "*OK*", ImagePath = "ms-appx:///Assets/emoji/bf.gif" },
+new EmojiItem { Code = "*WASSUP*", ImagePath = "ms-appx:///Assets/emoji/bg.gif" },
+new EmojiItem { Code = "*SORRY*", ImagePath = "ms-appx:///Assets/emoji/bh.gif" },
+new EmojiItem { Code = "*BRAVO*", ImagePath = "ms-appx:///Assets/emoji/bi.gif" },
+new EmojiItem { Code = "*ROFL*", ImagePath = "ms-appx:///Assets/emoji/bj.gif" },
+new EmojiItem { Code = "*PARDON*", ImagePath = "ms-appx:///Assets/emoji/bk.gif" },
+new EmojiItem { Code = "*NO*", ImagePath = "ms-appx:///Assets/emoji/bl.gif" },
+new EmojiItem { Code = "*CRAZY*", ImagePath = "ms-appx:///Assets/emoji/bm.gif" },
+new EmojiItem { Code = "*DONT_KNOW*", ImagePath = "ms-appx:///Assets/emoji/bn.gif" },
+new EmojiItem { Code = "*DANCE*", ImagePath = "ms-appx:///Assets/emoji/bo.gif" },
+new EmojiItem { Code = "*YAHOO*", ImagePath = "ms-appx:///Assets/emoji/bp.gif" },
+
+};
 
         private void BackButton_Click(object sender, RoutedEventArgs e)
         {
@@ -725,5 +837,11 @@ namespace kicq4WP
             if (PropertyChanged != null)
                 PropertyChanged(this, new PropertyChangedEventArgs(name));
         }
+        public class EmojiItem
+        {
+            public string Code { get; set; }      // То, что печатается в чате: ":)", ":D"
+            public string ImagePath { get; set; } // Путь к гифке в ресурсах
+        }
+
     }
 }

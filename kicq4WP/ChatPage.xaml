@@ -92,54 +92,56 @@
             <ListView.ItemTemplate>
                 <DataTemplate>
                     <Grid MinHeight="10">
-                        <!-- Входящее — слева -->
                         <Border HorizontalAlignment="Left"
-                                MaxWidth="280"
-                                Background="#FF1E293B"
-                                Padding="10,7,10,7"
-                                Margin="0,0,50,0"
-                                Holding="MessageBorder_Holding"
-                                Visibility="{Binding IsIncoming, Converter={StaticResource BoolToVisibilityConverter}}">
+                MaxWidth="280"
+                Background="#FF1E293B"
+                Padding="10,7,10,7"
+                Margin="0,0,50,0"
+                Holding="MessageBorder_Holding"
+                Visibility="{Binding IsIncoming, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
                                 <TextBlock Text="{Binding SenderName}"
-                                           FontSize="12"
-                                           FontFamily="Segoe WP"
-                                           Foreground="{StaticResource PhoneAccentBrush}"
-                                           Margin="0,0,0,2"/>
-                                <TextBlock Text="{Binding Text}"
-                                           FontSize="17"
-                                           FontFamily="Segoe WP"
-                                           Foreground="White"
-                                           TextWrapping="Wrap"/>
+                           FontSize="12"
+                           FontFamily="Segoe WP"
+                           Foreground="{StaticResource PhoneAccentBrush}"
+                           Margin="0,0,0,2"/>
+
+                                <RichTextBlock local:EmojiManager.FormattedText="{Binding Text}"
+                               FontSize="17"
+                               FontFamily="Segoe WP"
+                               Foreground="White"
+                               TextWrapping="Wrap"/>
+
                                 <TextBlock Text="{Binding Time}"
-                                           FontSize="11"
-                                           FontFamily="Segoe WP"
-                                           Foreground="#88FFFFFF"
-                                           HorizontalAlignment="Right"
-                                           Margin="0,3,0,0"/>
+                           FontSize="11"
+                           FontFamily="Segoe WP"
+                           Foreground="#88FFFFFF"
+                           HorizontalAlignment="Right"
+                           Margin="0,3,0,0"/>
                             </StackPanel>
                         </Border>
 
-                        <!-- Исходящее — справа -->
                         <Border HorizontalAlignment="Right"
-                                MaxWidth="280"
-                                Background="{StaticResource PhoneAccentBrush}"
-                                Padding="10,7,10,7"
-                                Margin="50,0,0,0"
-                                Holding="MessageBorder_Holding"
-                                Visibility="{Binding IsOutgoing, Converter={StaticResource BoolToVisibilityConverter}}">
+                MaxWidth="280"
+                Background="{StaticResource PhoneAccentBrush}"
+                Padding="10,7,10,7"
+                Margin="50,0,0,0"
+                Holding="MessageBorder_Holding"
+                Visibility="{Binding IsOutgoing, Converter={StaticResource BoolToVisibilityConverter}}">
                             <StackPanel>
-                                <TextBlock Text="{Binding Text}"
-                                           FontSize="17"
-                                           FontFamily="Segoe WP"
-                                           Foreground="White"
-                                           TextWrapping="Wrap"/>
+
+                                <RichTextBlock local:EmojiManager.FormattedText="{Binding Text}"
+                               FontSize="17"
+                               FontFamily="Segoe WP"
+                               Foreground="White"
+                               TextWrapping="Wrap"/>
+
                                 <TextBlock Text="{Binding Time}"
-                                           FontSize="11"
-                                           FontFamily="Segoe WP"
-                                           Foreground="#88FFFFFF"
-                                           HorizontalAlignment="Right"
-                                           Margin="0,3,0,0"/>
+                           FontSize="11"
+                           FontFamily="Segoe WP"
+                           Foreground="#88FFFFFF"
+                           HorizontalAlignment="Right"
+                           Margin="0,3,0,0"/>
                             </StackPanel>
                         </Border>
                     </Grid>
@@ -153,18 +155,32 @@
                 Background="#FF1A1A1A"
                 Padding="4"
                 Visibility="Collapsed">
-            <StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <Button Content=":-)" Click="InsertEmoji_Click" Tag=":-)" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button Content=";-)" Click="InsertEmoji_Click" Tag=";-)" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button Content=":-(" Click="InsertEmoji_Click" Tag=":-(" Style="{StaticResource EmojiButtonStyle}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <Button Content="8-)" Click="InsertEmoji_Click" Tag="8-)" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button Content=":-D" Click="InsertEmoji_Click" Tag=":-D" Style="{StaticResource EmojiButtonStyle}"/>
-                    <Button Content="]:->" Click="InsertEmoji_Click" Tag="]:->" Style="{StaticResource EmojiButtonStyle}"/>
-                </StackPanel>
-            </StackPanel>
+            <ScrollViewer x:Name="EmojiPickerScroll"
+              Height="250"
+              Background="#222222"
+              VerticalScrollBarVisibility="Auto"
+              HorizontalScrollBarVisibility="Disabled">
+
+                <ItemsControl x:Name="EmojiItemsControl">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapGrid Orientation="Horizontal" HorizontalAlignment="Center"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Style="{StaticResource EmojiButtonStyle}" 
+                        Click="OnEmojiPicked"
+                        Tag="{Binding Code}" 
+                        ToolTipService.ToolTip="{Binding Code}">
+                                <Image Source="{Binding ImagePath}" Width="28" Height="28"/>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
         </Border>
 
         <!-- Панель "Ответить на сообщение" -->

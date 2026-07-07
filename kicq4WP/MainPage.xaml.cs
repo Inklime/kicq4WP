@@ -83,8 +83,8 @@ namespace kicq4WP
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            SoundService.SetPlayer(SoundPlayer, Dispatcher);
 
+            // 1. ПЕРВИЧНАЯ ИНИЦИАЛИЗАЦИЯ (выполняется только один раз)
             if (!_initialized)
             {
                 var oscarProtocol = e.Parameter as OscarProtocol;
@@ -95,26 +95,62 @@ namespace kicq4WP
 
                 SaveLastUin(_oscarProtocol.UIN);
                 UinTextBlock.Text = _oscarProtocol.UIN;
-               // UpdateOwnStatusIcon(0x10010000);
-
-                var reconnect = ((App)Application.Current).ReconnectService;
-                if (reconnect != null)
-                {
-                    reconnect.OnDisconnected += OnConnectionLost;
-                    reconnect.Reconnected += OnReconnected;
-                }
-                _oscarProtocol.ContactStatusChanged += () =>
-                {
-                    ApplySettings();
-                };
-                reconnect.KickedOut += OnKickedOut;
-                NotificationService.Instance.UnreadChanged += OnUnreadChanged;
                 LoadContacts(0x00000000);
             }
-            else
+
+            // 2. ПОДПИСКИ НА СОБЫТИЯ (выполняются каждый раз при входе на страницу)
+            var reconnect = ((App)Application.Current).ReconnectService;
+            if (reconnect != null)
             {
-                // Возврат с другой страницы (настройки, чат) — применяем настройки
+                // Сначала отписываемся для защиты от двойных подписок
+                reconnect.OnDisconnected -= OnConnectionLost;
+                reconnect.OnDisconnected += OnConnectionLost;
+
+                reconnect.Reconnected -= OnReconnected;
+                reconnect.Reconnected += OnReconnected;
+
+                reconnect.KickedOut -= OnKickedOut;
+                reconnect.KickedOut += OnKickedOut;
+            }
+
+            if (_oscarProtocol != null)
+            {
+                _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged;
+                _oscarProtocol.ContactStatusChanged += OnContactStatusChanged;
+            }
+
+            NotificationService.Instance.UnreadChanged -= OnUnreadChanged;
+            NotificationService.Instance.UnreadChanged += OnUnreadChanged;
+
+            // 3. ДЕЙСТВИЯ ПРИ ВОЗВРАТЕ (например, из чата)
+            if (_initialized)
+            {
                 ApplySettings();
+
+                // Принудительно обновляем маркеры у всех контактов!
+                // Чат обнулил счетчик пока мы были отписаны от событий, поэтому запрашиваем актуальные данные.
+                OnUnreadChanged();
+            }
+        }
+
+        protected override void OnNavigatedFrom(NavigationEventArgs e)
+        {
+            base.OnNavigatedFrom(e);
+
+            // ОТПИСКИ ОТ СОБЫТИЙ (чтобы страница не "жрала" ресурсы в фоне)
+            NotificationService.Instance.UnreadChanged -= OnUnreadChanged;
+
+            var reconnect = ((App)Application.Current).ReconnectService;
+            if (reconnect != null)
+            {
+                reconnect.OnDisconnected -= OnConnectionLost;
+                reconnect.Reconnected -= OnReconnected;
+                reconnect.KickedOut -= OnKickedOut;
+            }
+
+            if (_oscarProtocol != null)
+            {
+                try { _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged; } catch { }
             }
         }
 
@@ -131,19 +167,6 @@ namespace kicq4WP
             });
         }
 
-        protected override void OnNavigatedFrom(NavigationEventArgs e)
-        {
-            base.OnNavigatedFrom(e);
-            NotificationService.Instance.UnreadChanged -= OnUnreadChanged;
-
-            var reconnect = ((App)Application.Current).ReconnectService;
-            if (reconnect != null)
-            {
-                reconnect.OnDisconnected -= OnConnectionLost;
-                reconnect.Reconnected -= OnReconnected;
-            }
-            try { _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged; } catch { }
-        }
 
         private async void OnContactStatusChanged()
         {
@@ -164,16 +187,27 @@ namespace kicq4WP
             }
         }
 
-        private void OnReconnected(OscarProtocol newOscar)
+        private async void OnReconnected(OscarProtocol newOscar)
         {
             if (_oscarProtocol != null)
                 _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged;
 
             _oscarProtocol = newOscar;
             _oscarProtocol.ContactStatusChanged += OnContactStatusChanged;
-            UinTextBlock.Text = _oscarProtocol.UIN;
-            foreach (var contact in Contacts)
-                contact.StatusIcon = "/Assets/statuses/offline.png";
+
+            var fresh = await _oscarProtocol.GetContactsAsync(0);
+
+            await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
+            {
+                UinTextBlock.Text = _oscarProtocol.UIN;
+
+                Contacts.Clear();
+                foreach (var c in fresh)
+                    Contacts.Add(c);
+
+                SortContacts();
+                RefreshView();
+            });
         }
 
         private void OnUnreadChanged()

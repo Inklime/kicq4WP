@@ -852,6 +852,8 @@ namespace kicq4WP
             // 6. SNAC(04,04) — ICBM params
             await SendSnacAsync(0x04, 0x04, 0x00, GetNextRequestID(), null);
 
+            await SendIcbmParametersAsync();
+
             // 7. SNAC(09,02) — privacy limits
             await SendSnacAsync(0x09, 0x02, 0x00, GetNextRequestID(), null);
 
@@ -2028,6 +2030,7 @@ namespace kicq4WP
         {
             try
             {
+                Debug.WriteLine("Raw ICBM: " + BitConverter.ToString(data));
                 int offset = 0;
 
                 // skip 8 bytes cookie
@@ -2152,6 +2155,45 @@ namespace kicq4WP
                     }
                 }
 
+                else if (channel == 0x0002)
+                {
+                    // Channel 2 — ищем TLV(0x0005) rendezvous data
+                    while (offset + 4 <= data.Length)
+                    {
+                        ushort tlvType = ReadU16(data, ref offset);
+                        ushort tlvLen = ReadU16(data, ref offset);
+                        int tlvEnd = offset + tlvLen;
+                        if (tlvEnd > data.Length) break;
+
+                        if (tlvType == 0x0005)
+                        {
+                            // Внутри TLV(0x0005): msgType(2) + cookie(8) + capability(16) + TLVs
+                            int inner = offset;
+                            inner += 2;  // msgType
+                            inner += 8;  // cookie
+                            inner += 16; // capability GUID
+
+                            // Парсим вложенные TLV
+                            while (inner + 4 <= tlvEnd)
+                            {
+                                ushort it = ReadU16(data, ref inner);
+                                ushort il = ReadU16(data, ref inner);
+                                int ie = inner + il;
+                                if (ie > tlvEnd) break;
+
+                                if (it == 0x2711 && il > 0)
+                                {
+                                    text = ParseChannel2ExtData(data, inner, il);
+                                    Debug.WriteLine("[ICBM ch2] Parsed text: " + text);
+                                }
+                                inner = ie;
+                            }
+                        }
+                        offset = tlvEnd;
+                        if (text != null) break;
+                    }
+                }
+
                 if (text != null)
                 {
                     // Сохраняем в очередь
@@ -2179,6 +2221,70 @@ namespace kicq4WP
             catch (Exception ex)
             {
                 Debug.WriteLine($"[HandleIncomingIcbm ERROR] {ex}");
+            }
+        }
+
+        private string ParseChannel2ExtData(byte[] data, int offset, int len)
+        {
+            try
+            {
+                int end = offset + len;
+
+                // 1. Читаем первый блок (Chunk 1) - там лежат GUID плагина и capabilities
+                if (offset + 2 > end) return null;
+                ushort chunk1Len = ReadU16LE(data, ref offset);
+
+                // Пропускаем содержимое первого блока
+                if (offset + chunk1Len > end) return null;
+                offset += chunk1Len;
+
+                // 2. Читаем второй блок (Chunk 2) - служебные счетчики
+                if (offset + 2 > end) return null;
+                ushort chunk2Len = ReadU16LE(data, ref offset);
+
+                // Пропускаем содержимое второго блока
+                if (offset + chunk2Len > end) return null;
+                offset += chunk2Len;
+
+                // 3. Теперь начинается сам блок сообщения
+                // Проверяем, что есть как минимум 8 байт для заголовка: 
+                // type(1) + flags(1) + status(2) + priority(2) + msgLen(2)
+                if (offset + 8 > end) return null;
+
+                byte msgType = data[offset++];
+                byte msgFlags = data[offset++];
+                ushort statusCode = ReadU16LE(data, ref offset);
+                ushort priorityCode = ReadU16LE(data, ref offset);
+                ushort msgLen = ReadU16LE(data, ref offset);
+
+                if (msgLen == 0) return "";
+
+                // Защита от «кривых» клиентов, указывающих размер больше реального
+                if (offset + msgLen > end)
+                {
+                    msgLen = (ushort)(end - offset);
+                }
+
+                // 4. Убираем null-терминаторы в конце строки (0x00)
+                int textLen = msgLen;
+                while (textLen > 0 && (data[offset + textLen - 1] == 0x00 || data[offset + textLen - 1] == 0xFF))
+                {
+                    textLen--;
+                }
+
+                if (textLen == 0) return "";
+
+                // 5. Декодируем текст
+                // Для Channel 2 в 99% случаев используется локальная кодировка (Win-1251)
+                string text = Encoding.UTF8.GetString(data, offset, textLen);
+
+                Debug.WriteLine("[ICBM ch2] Parsed text: " + text);
+                return text;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ParseChannel2ExtData ERROR] " + ex);
+                return null;
             }
         }
 

@@ -275,7 +275,7 @@
                         <TextBlock Text="ICQ клиент для Windows Phone 8.1"
                                    FontSize="14" FontFamily="Segoe WP"
                                    Foreground="#88FFFFFF" Margin="0,4,0,0"/>
-                        <TextBlock Text="Версия: 1.1.1.1"
+                        <TextBlock Text="Версия: 1.2.1.1"
                                    FontSize="13" FontFamily="Segoe WP"
                                    Foreground="#66FFFFFF" Margin="0,2,0,0"/>
                     </StackPanel>

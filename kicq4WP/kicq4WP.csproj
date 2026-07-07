@@ -94,6 +94,7 @@
     <Compile Include="Contactgroup.cs" />
     <Compile Include="ContactInfo.cs" />
     <Compile Include="ContactStorage.cs" />
+    <Compile Include="EmojiManager.cs" />
     <Compile Include="InfoPage.xaml.cs">
       <DependentUpon>InfoPage.xaml</DependentUpon>
     </Compile>
@@ -126,6 +127,55 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Assets\desc.txt" />
+    <Content Include="Assets\emoji\aa.gif" />
+    <Content Include="Assets\emoji\ab.gif" />
+    <Content Include="Assets\emoji\ac.gif" />
+    <Content Include="Assets\emoji\ad.gif" />
+    <Content Include="Assets\emoji\ae.gif" />
+    <Content Include="Assets\emoji\af.gif" />
+    <Content Include="Assets\emoji\ag.gif" />
+    <Content Include="Assets\emoji\ah.gif" />
+    <Content Include="Assets\emoji\ai.gif" />
+    <Content Include="Assets\emoji\aj.gif" />
+    <Content Include="Assets\emoji\ak.gif" />
+    <Content Include="Assets\emoji\al.gif" />
+    <Content Include="Assets\emoji\am.gif" />
+    <Content Include="Assets\emoji\an.gif" />
+    <Content Include="Assets\emoji\ao.gif" />
+    <Content Include="Assets\emoji\ap.gif" />
+    <Content Include="Assets\emoji\aq.gif" />
+    <Content Include="Assets\emoji\ar.gif" />
+    <Content Include="Assets\emoji\as.gif" />
+    <Content Include="Assets\emoji\at.gif" />
+    <Content Include="Assets\emoji\au.gif" />
+    <Content Include="Assets\emoji\av.gif" />
+    <Content Include="Assets\emoji\aw.gif" />
+    <Content Include="Assets\emoji\ax.gif" />
+    <Content Include="Assets\emoji\ay.gif" />
+    <Content Include="Assets\emoji\az.gif" />
+    <Content Include="Assets\emoji\ba.gif" />
+    <Content Include="Assets\emoji\bb.gif" />
+    <Content Include="Assets\emoji\bc.gif" />
+    <Content Include="Assets\emoji\bd.gif" />
+    <Content Include="Assets\emoji\be.gif" />
+    <Content Include="Assets\emoji\bf.gif" />
+    <Content Include="Assets\emoji\bg.gif" />
+    <Content Include="Assets\emoji\bh.gif" />
+    <Content Include="Assets\emoji\bi.gif" />
+    <Content Include="Assets\emoji\bj.gif" />
+    <Content Include="Assets\emoji\bk.gif" />
+    <Content Include="Assets\emoji\bl.gif" />
+    <Content Include="Assets\emoji\bm.gif" />
+    <Content Include="Assets\emoji\bn.gif" />
+    <Content Include="Assets\emoji\bo.gif" />
+    <Content Include="Assets\emoji\bp.gif" />
+    <Content Include="Assets\emoji\bq.gif" />
+    <Content Include="Assets\emoji\br.gif" />
+    <Content Include="Assets\emoji\bs.gif" />
+    <Content Include="Assets\emoji\bt.gif" />
+    <Content Include="Assets\emoji\bu.gif" />
+    <Content Include="Assets\emoji\bv.gif" />
+    <Content Include="Assets\emoji\bw.gif" />
     <Content Include="Assets\icons\added.png" />
     <Content Include="Assets\icons\newmsg.png" />
     <Content Include="Assets\Logo.scale-100.png" />
