@@ -105,7 +105,9 @@
             </ListView.GroupStyle>
             <ListView.ItemTemplate>
                 <DataTemplate>
-                    <Grid MinHeight="68">
+                    <Grid MinHeight="68"
+      Holding="ContactItem_Holding"
+      >
                         <Grid.Background>
                             <SolidColorBrush Color="#FF161B22"
                          Opacity="{Binding BackgroundAlpha,
@@ -117,7 +119,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        
+
 
                         <!-- Левая полоска акцентного цвета -->
                         <Rectangle Grid.Column="0"
@@ -189,82 +191,108 @@
                 Visibility="Collapsed"
                 VerticalAlignment="Bottom">
             <StackPanel>
-                <!-- Заголовок панели -->
+                <!-- Заголовок -->
                 <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,12,16,12">
                     <TextBlock Text="Выберите статус"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               FontFamily="Segoe WP"
-                               Foreground="White"/>
+                               FontSize="16" FontWeight="SemiBold"
+                               FontFamily="Segoe WP" Foreground="White"/>
                 </Border>
 
-                <Button Tag="00000000" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="/Assets/statuses/online.png" Width="28" Height="28" Margin="0,0,14,0"/>
-                        <TextBlock Text="Онлайн" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
-                    </StackPanel>
-                </Button>
+                <!-- Список статусов со скроллом -->
+                <ScrollViewer MaxHeight="480" VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <Button Tag="10010000" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/online.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Онлайн" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
-                <Button Tag="00000020" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="/Assets/statuses/f4c.png" Width="28" Height="28" Margin="0,0,14,0"/>
-                        <TextBlock Text="Готов поболтать" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
-                    </StackPanel>
-                </Button>
+                        <Button Tag="10010020" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/f4c.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Готов поболтать" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
-                <Button Tag="00000001" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="/Assets/statuses/away.png" Width="28" Height="28" Margin="0,0,14,0"/>
-                        <TextBlock Text="Отошел" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
-                    </StackPanel>
-                </Button>
+                        <Button Tag="10010001" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/away.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Отошел" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
-                <Button Tag="00000002" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="/Assets/statuses/dnd.png" Width="28" Height="28" Margin="0,0,14,0"/>
-                        <TextBlock Text="Не беспокоить" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
-                    </StackPanel>
-                </Button>
+                        <Button Tag="10010002" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/dnd.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Не беспокоить" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
-                <Button Tag="00000004" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="/Assets/statuses/na.png" Width="28" Height="28" Margin="0,0,14,0"/>
-                        <TextBlock Text="Недоступен" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
-                    </StackPanel>
-                </Button>
+                        <Button Tag="10010004" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/na.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Недоступен" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
-                <Button Tag="00000010" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="/Assets/statuses/busy.png" Width="28" Height="28" Margin="0,0,14,0"/>
-                        <TextBlock Text="Занят" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
-                    </StackPanel>
-                </Button>
+                        <Button Tag="10010010" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/busy.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Занят" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
-                <Button Tag="00000100" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
-                    <StackPanel Orientation="Horizontal">
-                        <Image Source="/Assets/statuses/inv.png" Width="28" Height="28" Margin="0,0,14,0"/>
-                        <TextBlock Text="Невидимый" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
-                    </StackPanel>
-                </Button>
+                        <Button Tag="10010100" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/inv.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Невидимый" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
 
-                <!-- Кнопка закрыть -->
-                <Button Click="StatusPanelClose_Click"
-                        Background="#FF1A1A2E"
-                        BorderThickness="0"
-                        HorizontalAlignment="Stretch"
-                        HorizontalContentAlignment="Center"
-                        Padding="16,14,16,14">
-                    <TextBlock Text="Отмена"
-                               FontSize="16"
-                               FontFamily="Segoe WP"
-                               Foreground="#88FFFFFF"/>
-                </Button>
+                        <Button Tag="10013000" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/evil.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Злой" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="10014000" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/depressed.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Депрессия" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="10015000" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/home.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Дома" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="10016000" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/work.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Работа" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Tag="10012001" Click="SetStatus_Click" Style="{StaticResource StatusItemStyle}">
+                            <StackPanel Orientation="Horizontal">
+                                <Image Source="/Assets/statuses/eating.png" Width="28" Height="28" Margin="0,0,14,0"/>
+                                <TextBlock Text="Кушаю" VerticalAlignment="Center" FontFamily="Segoe WP" FontSize="18" Foreground="White"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
             </StackPanel>
         </Border>
         <!-- В конце Grid, невидимый элемент -->
-        <MediaElement x:Name="SoundPlayer" 
-              AutoPlay="False" 
-              Volume="1.0"
-              Width="0" Height="0"/>
+        <MediaElement x:Name="SoundPlayer"
+              Grid.Row="0" Grid.RowSpan="2"
+              AutoPlay="False"
+              Opacity="0"
+              Width="1" Height="1"/>
     </Grid>
 </Page>

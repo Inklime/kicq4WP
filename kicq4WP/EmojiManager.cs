@@ -4,6 +4,7 @@ using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Documents;
 using Windows.UI.Xaml.Media.Imaging;
+using XamlAnimatedGif;
 
 namespace kicq4WP
 {
@@ -72,53 +73,63 @@ namespace kicq4WP
 
         private static void OnTextChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
-            RichTextBlock richText = d as RichTextBlock;
+            var richText = d as RichTextBlock;
+            if (richText == null) return;
 
-            if (richText != null)
+            richText.Blocks.Clear();
+            string text = e.NewValue as string ?? "";
+            if (string.IsNullOrEmpty(text)) return;
+
+            var paragraph = new Paragraph();
+
+            int currentIndex = 0;
+            while (currentIndex < text.Length)
             {
-                richText.Blocks.Clear();
-                string text = e.NewValue as string ?? "";
-                var paragraph = new Paragraph();
+                int firstMatchIndex = -1;
+                string matchedEmoji = null;
 
-                int currentIndex = 0;
-                while (currentIndex < text.Length)
+                foreach (var emoji in EmojiDict.Keys)
                 {
-                    int firstMatchIndex = -1;
-                    string matchedEmoji = null;
-
-                    foreach (var emoji in EmojiDict.Keys)
+                    int index = text.IndexOf(emoji, currentIndex, StringComparison.Ordinal);
+                    if (index != -1 && (firstMatchIndex == -1 || index < firstMatchIndex))
                     {
-                        int index = text.IndexOf(emoji, currentIndex);
-                        if (index != -1 && (firstMatchIndex == -1 || index < firstMatchIndex))
-                        {
-                            firstMatchIndex = index;
-                            matchedEmoji = emoji;
-                        }
-                    }
-
-                    if (firstMatchIndex != -1)
-                    {
-                        if (firstMatchIndex > currentIndex)
-                            paragraph.Inlines.Add(new Run { Text = text.Substring(currentIndex, firstMatchIndex - currentIndex) });
-
-                        var img = new Image
-                        {
-                            Source = new BitmapImage(new Uri(EmojiDict[matchedEmoji])),
-                            Width = 24,
-                            Height = 24,
-                            Margin = new Thickness(2, 0, 2, -4)
-                        };
-                        paragraph.Inlines.Add(new InlineUIContainer { Child = img });
-                        currentIndex = firstMatchIndex + matchedEmoji.Length;
-                    }
-                    else
-                    {
-                        paragraph.Inlines.Add(new Run { Text = text.Substring(currentIndex) });
-                        break;
+                        firstMatchIndex = index;
+                        matchedEmoji = emoji;
                     }
                 }
-                richText.Blocks.Add(paragraph);
+
+                if (firstMatchIndex != -1)
+                {
+                    if (firstMatchIndex > currentIndex)
+                        paragraph.Inlines.Add(new Run
+                        {
+                            Text = text.Substring(currentIndex, firstMatchIndex - currentIndex)
+                        });
+
+                    // BitmapImage загружается асинхронно — не блокирует UI
+                    var bitmap = new BitmapImage(new Uri(EmojiDict[matchedEmoji]));
+
+                    var img = new Image
+                    {
+                        Width = 32,
+                        Height = 32,
+                        Margin = new Thickness(2, -6, 2, -6),
+                        Stretch = Windows.UI.Xaml.Media.Stretch.Uniform,
+                        Source = bitmap
+                    };
+
+                    paragraph.Inlines.Add(new InlineUIContainer { Child = img });
+                    currentIndex = firstMatchIndex + matchedEmoji.Length;
+                }
+                else
+                {
+                    paragraph.Inlines.Add(new Run { Text = text.Substring(currentIndex) });
+                    break;
+                }
             }
+
+            richText.Blocks.Add(paragraph);
         }
     }
+
 }

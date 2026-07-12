@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:kicq4WP"
+    xmlns:gif="using:XamlAnimatedGif"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
@@ -149,38 +150,43 @@
             </ListView.ItemTemplate>
         </ListView>
 
+
         <!-- Панель эмодзи -->
         <Border x:Name="EmojiPanel"
-                Grid.Row="2"
-                Background="#FF1A1A1A"
-                Padding="4"
-                Visibility="Collapsed">
-            <ScrollViewer x:Name="EmojiPickerScroll"
-              Height="250"
+        Grid.Row="2"
+        Background="#FF1A1A1A"
+        Padding="4"
+        Visibility="Collapsed">
+            <GridView x:Name="EmojiItemsControl"
+              Height="200"
               Background="#222222"
-              VerticalScrollBarVisibility="Auto"
-              HorizontalScrollBarVisibility="Disabled">
-
-                <ItemsControl x:Name="EmojiItemsControl">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapGrid Orientation="Horizontal" HorizontalAlignment="Center"/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Button Style="{StaticResource EmojiButtonStyle}" 
-                        Click="OnEmojiPicked"
-                        Tag="{Binding Code}" 
-                        ToolTipService.ToolTip="{Binding Code}">
-                                <Image Source="{Binding ImagePath}" Width="28" Height="28"/>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-
+              SelectionMode="None"
+              IsItemClickEnabled="True"
+              ItemClick="OnEmojiPicked_GridView">
+                <GridView.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapGrid Orientation="Horizontal"
+                          MaximumRowsOrColumns="7"
+                          ItemWidth="52"
+                          ItemHeight="52"/>
+                    </ItemsPanelTemplate>
+                </GridView.ItemsPanel>
+                <GridView.ItemContainerStyle>
+                    <Style TargetType="GridViewItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                    </Style>
+                </GridView.ItemContainerStyle>
+                <GridView.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="48" Height="48" Background="Transparent">
+                            <Image Source="{Binding ImagePath}"
+                           Width="36" Height="36"
+                           Stretch="Uniform"/>
+                        </Border>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
         </Border>
 
         <!-- Панель "Ответить на сообщение" -->
@@ -229,8 +235,13 @@
                          PlaceholderText="Сообщение..."
                          Margin="4,0,10.333,0"
                          VerticalAlignment="Bottom"
+                         TextChanged="MessageTextBox_TextChanged"
                          KeyDown="MessageTextBox_KeyDown"
                          Grid.ColumnSpan="2"/>
+                <MediaElement x:Name="SoundPlayer"
+              Grid.Row="0" Grid.RowSpan="4"
+              AutoPlay="False"
+              Width="0" Height="0"/>
             </Grid>
         </Border>
 
@@ -250,11 +261,6 @@
             <AppBarButton Icon="Emoji2" Label="Смайлики" Click="EmojiButton_Click" Foreground="White"/>
 
             <CommandBar.SecondaryCommands>
-                <AppBarButton Label="Скопировать UIN"  Icon="Copy"   Click="CopyUin_Click"/>
-                <AppBarButton Label="Информация"        Icon="People" Click="ContactInfo_Click"/>
-                <AppBarButton Label="Переименовать"     Icon="Edit"   Click="RenameContact_Click"/>
-                <AppBarButton Label="Удалить контакт"   Icon="Delete" Click="DeleteContact_Click"/>
-                <AppBarButton Label="Очистить чат" Icon="Delete" Click="ClearChat_Click"/>
             </CommandBar.SecondaryCommands>
         </CommandBar>
     </Page.BottomAppBar>

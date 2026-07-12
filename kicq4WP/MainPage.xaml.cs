@@ -22,6 +22,9 @@ namespace kicq4WP
         private Task _;
         private bool _showGroups = false;
         private bool _hideOffline = false;
+        private Contact _holdContact;
+        private uint _currentStatus = 0x10010000;
+
 
 
         public ObservableCollection<Contact> Contacts { get; set; }
@@ -87,6 +90,9 @@ namespace kicq4WP
             // 1. ПЕРВИЧНАЯ ИНИЦИАЛИЗАЦИЯ (выполняется только один раз)
             if (!_initialized)
             {
+                SoundPlayer.AudioCategory = Windows.UI.Xaml.Media.AudioCategory.GameEffects;
+                SoundPlayer.AudioDeviceType = Windows.UI.Xaml.Media.AudioDeviceType.Multimedia;
+                SoundService.SetPlayer(SoundPlayer, Dispatcher);
                 var oscarProtocol = e.Parameter as OscarProtocol;
                 if (oscarProtocol == null) return;
 
@@ -111,6 +117,10 @@ namespace kicq4WP
 
                 reconnect.KickedOut -= OnKickedOut;
                 reconnect.KickedOut += OnKickedOut;
+
+                _oscarProtocol.ContactRenamed += OnContactRenamed;
+                _oscarProtocol.ContactRemoved += OnContactRemoved;
+                _oscarProtocol.TemporaryContactAdded += OnTemporaryContactAdded;
             }
 
             if (_oscarProtocol != null)
@@ -121,6 +131,13 @@ namespace kicq4WP
 
             NotificationService.Instance.UnreadChanged -= OnUnreadChanged;
             NotificationService.Instance.UnreadChanged += OnUnreadChanged;
+
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            object savedStatus = settings.Values["LastStatus"];
+            if (savedStatus != null)
+                _currentStatus = (uint)(long)savedStatus;
+
+            UpdateOwnStatusIcon(_currentStatus);
 
             // 3. ДЕЙСТВИЯ ПРИ ВОЗВРАТЕ (например, из чата)
             if (_initialized)
@@ -146,11 +163,125 @@ namespace kicq4WP
                 reconnect.OnDisconnected -= OnConnectionLost;
                 reconnect.Reconnected -= OnReconnected;
                 reconnect.KickedOut -= OnKickedOut;
+                _oscarProtocol.ContactRenamed -= OnContactRenamed;
+                _oscarProtocol.ContactRemoved -= OnContactRemoved;
+                _oscarProtocol.TemporaryContactAdded -= OnTemporaryContactAdded;
             }
 
             if (_oscarProtocol != null)
             {
                 try { _oscarProtocol.ContactStatusChanged -= OnContactStatusChanged; } catch { }
+            }
+        }
+
+        private async void ContactItem_Holding(object sender,
+    Windows.UI.Xaml.Input.HoldingRoutedEventArgs e)
+        {
+            if (e.HoldingState != Windows.UI.Input.HoldingState.Started) return;
+            var grid = sender as Grid;
+            if (grid == null) return;
+            _holdContact = grid.DataContext as Contact;
+            if (_holdContact == null) return;
+            await ShowContactContextMenu();
+        }
+
+        private async Task ShowContactContextMenu()
+        {
+            if (_holdContact == null) return;
+
+            if (_holdContact.IsTemporary)
+            {
+                var dialog = new Windows.UI.Popups.MessageDialog(
+                    _holdContact.Name + " (" + _holdContact.Uin + ")", "Действия");
+                dialog.Commands.Add(new Windows.UI.Popups.UICommand("Добавить в контакты", async cmd =>
+                {
+                    try
+                    {
+                        await _oscarProtocol.AddContactAsync(_holdContact.Uin, _holdContact.Name);
+                        _holdContact.IsTemporary = false;
+                        SortContacts();
+                    }
+                    catch (Exception ex)
+                    {
+                        await new Windows.UI.Popups.MessageDialog("Ошибка: " + ex.Message).ShowAsync();
+                    }
+                }));
+                dialog.Commands.Add(new Windows.UI.Popups.UICommand("Отмена"));
+                await dialog.ShowAsync();
+                return;
+            }
+
+            // Для обычных контактов — меню через цепочку диалогов
+            bool showMore = true;
+            while (showMore)
+            {
+                showMore = false;
+                var dialog = new Windows.UI.Popups.MessageDialog(
+                    _holdContact.Name + " (" + _holdContact.Uin + ")", "Действия");
+
+                dialog.Commands.Add(new Windows.UI.Popups.UICommand("Переим./Удалить", async cmd =>
+                {
+                    var d2 = new Windows.UI.Popups.MessageDialog(_holdContact.Name, "Изменить");
+                    d2.Commands.Add(new Windows.UI.Popups.UICommand("Переименовать", async c =>
+                    {
+                        await ShowRenamePopupMain(_holdContact);
+                    }));
+                    d2.Commands.Add(new Windows.UI.Popups.UICommand("Удалить", async c =>
+                    {
+                        var confirm = new Windows.UI.Popups.MessageDialog(
+                            "Удалить " + _holdContact.Name + "?", "Подтверждение");
+                        confirm.Commands.Add(new Windows.UI.Popups.UICommand("Удалить", async cc =>
+                        {
+                            try
+                            {
+                                await _oscarProtocol.RemoveContactAsync(_holdContact);
+                                Contacts.Remove(_holdContact);
+                                SortContacts();
+                            }
+                            catch (Exception ex)
+                            {
+                                await new Windows.UI.Popups.MessageDialog(
+                                    "Ошибка: " + ex.Message).ShowAsync();
+                            }
+                        }));
+                        confirm.Commands.Add(new Windows.UI.Popups.UICommand("Отмена"));
+                        await confirm.ShowAsync();
+                    }));
+                    await d2.ShowAsync();
+                }));
+
+                dialog.Commands.Add(new Windows.UI.Popups.UICommand("Информация", async cmd =>
+                {
+                    var d2 = new Windows.UI.Popups.MessageDialog(_holdContact.Name, "Инфо");
+
+                    d2.Commands.Add(new Windows.UI.Popups.UICommand("Информация", async c =>
+                    {
+                        var info = _holdContact.Info;
+                        string statusText = _holdContact.StatusIcon.Contains("offline")
+                            ? "Офлайн" : (info != null ? info.StatusText : "Неизвестно");
+
+                        var sb = new System.Text.StringBuilder();
+                        sb.AppendLine("UIN: " + _holdContact.Uin);
+                        sb.AppendLine("Имя: " + _holdContact.Name);
+                        sb.AppendLine("Группа: " + (_holdContact.Group ?? "—"));
+                        sb.AppendLine("Статус: " + statusText);
+                        if (info != null && !_holdContact.StatusIcon.Contains("offline"))
+                        {
+                            if (info.OnlineTime > 0) sb.AppendLine("Онлайн: " + info.OnlineTimeText);
+                            if (info.SignonTime > 0) sb.AppendLine("Зашел: " + info.SignonTimeText);
+                            if (info.MemberSince > 0) sb.AppendLine("Регистрация: " + info.MemberSinceText);
+                            if (!string.IsNullOrEmpty(info.StatusMessage))
+                                sb.AppendLine("Сообщение: " + info.StatusMessage);
+
+                        }
+                        await new Windows.UI.Popups.MessageDialog(sb.ToString(), _holdContact.Name).ShowAsync();
+                    }));
+
+
+                    await d2.ShowAsync();
+                }));
+
+                await dialog.ShowAsync();
             }
         }
 
@@ -167,7 +298,141 @@ namespace kicq4WP
             });
         }
 
+        private async Task ShowRenamePopupMain(Contact contact)
+        {
+            var popup = new Windows.UI.Xaml.Controls.Primitives.Popup();
+            var panel = new StackPanel
+            {
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 13, 17, 23)),
+                Width = Window.Current.Bounds.Width,
+                Margin = new Thickness(20, 16, 20, 16)
+            };
 
+            panel.Children.Add(new TextBlock
+            {
+                Text = "Новое имя для " + contact.Name,
+                FontSize = 16,
+                FontFamily = new Windows.UI.Xaml.Media.FontFamily("Segoe WP"),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(180, 255, 255, 255)),
+                Margin = new Thickness(0, 0, 0, 10)
+            });
+
+            var input = new TextBox
+            {
+                Text = contact.Name,
+                FontSize = 18,
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.Black),
+                Margin = new Thickness(0, 0, 0, 14)
+            };
+            panel.Children.Add(input);
+
+            var btnOk = new Button
+            {
+                Content = "Сохранить",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 0, 120, 215)),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(Windows.UI.Colors.White),
+                FontSize = 17,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            panel.Children.Add(btnOk);
+
+            var btnCancel = new Button
+            {
+                Content = "Отмена",
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Background = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(255, 40, 40, 40)),
+                Foreground = new Windows.UI.Xaml.Media.SolidColorBrush(
+                    Windows.UI.Color.FromArgb(180, 255, 255, 255)),
+                FontSize = 17
+            };
+            panel.Children.Add(btnCancel);
+
+            popup.Child = panel;
+            var tcs = new TaskCompletionSource<bool>();
+
+            btnOk.Click += async (s, args) =>
+            {
+                popup.IsOpen = false;
+                string newName = (input.Text ?? "").Trim();
+                if (!string.IsNullOrEmpty(newName) && newName != contact.Name)
+                {
+                    try { await _oscarProtocol.RenameContactAsync(contact, newName); }
+                    catch (Exception ex) { Debug.WriteLine("[Rename ERROR] " + ex.Message); }
+                }
+                tcs.TrySetResult(true);
+            };
+
+            btnCancel.Click += (s, args) =>
+            {
+                popup.IsOpen = false;
+                tcs.TrySetResult(false);
+            };
+
+            popup.IsOpen = true;
+            input.Focus(FocusState.Programmatic);
+            await tcs.Task;
+        }
+
+        // Метод перемещения в группу:
+        private async Task ShowMoveToGroupDialog(Contact contact)
+        {
+            var groups = _oscarProtocol.GetGroups()
+                .Where(g => g.GroupId != 0x0000 && g.GroupId != contact.GroupId)
+                .ToList();
+
+            if (groups.Count == 0)
+            {
+                await new Windows.UI.Popups.MessageDialog(
+                    "Других групп нет", "Переместить").ShowAsync();
+                return;
+            }
+
+            var dialog = new Windows.UI.Popups.MessageDialog(
+                "Выберите группу для " + contact.Name, "Переместить");
+
+            foreach (var g in groups)
+            {
+                var group = g;
+                dialog.Commands.Add(new Windows.UI.Popups.UICommand(group.Name, async cmd =>
+                {
+                    try { await _oscarProtocol.MoveContactAsync(contact, group.GroupId); }
+                    catch (Exception ex) { Debug.WriteLine("[Move ERROR] " + ex.Message); }
+                }));
+            }
+
+            dialog.Commands.Add(new Windows.UI.Popups.UICommand("Отмена"));
+            await dialog.ShowAsync();
+        }
+
+
+        private void OnTemporaryContactAdded(Contact contact)
+        {
+            if (!Contacts.Any(c => c.Uin == contact.Uin))
+            {
+                Contacts.Add(contact);
+                SortContacts();
+            }
+        }
+
+        private void OnContactRenamed(string uin, string newName)
+        {
+            // Contact.Name уже обновлён через INotifyPropertyChanged
+            // Просто пересортируем
+            SortContacts();
+        }
+
+        private void OnContactRemoved(string uin)
+        {
+            var toRemove = Contacts.Where(c => c.Uin == uin).ToList();
+            foreach (var c in toRemove) Contacts.Remove(c);
+            SortContacts();
+        }
         private async void OnContactStatusChanged()
         {
             await Dispatcher.RunAsync(Windows.UI.Core.CoreDispatcherPriority.Normal, () =>
@@ -245,21 +510,10 @@ namespace kicq4WP
             {
                 uint statusCode = Convert.ToUInt32(tagStr, 16);
                 await _oscarProtocol.SendSetStatusAsync(statusCode);
-
-                // Обновляем иконку в шапке
-                string icon;
-                switch (statusCode & 0xFFFF)
-                {
-                    case 0x0001: icon = "away"; break;
-                    case 0x0002: icon = "dnd"; break;
-                    case 0x0004: icon = "na"; break;
-                    case 0x0010: icon = "busy"; break;
-                    case 0x0020: icon = "f4c"; break;
-                    case 0x0100: icon = "inv"; break;
-                    default: icon = "online"; break;
-                }
-                OwnStatusIcon.Source = new Windows.UI.Xaml.Media.Imaging.BitmapImage(
-                    new Uri("ms-appx:///Assets/statuses/" + icon + ".png"));
+                _currentStatus = statusCode;
+                Windows.Storage.ApplicationData.Current.LocalSettings
+                    .Values["LastStatus"] = (long)statusCode;
+                UpdateOwnStatusIcon(statusCode);
             }
             catch (Exception ex)
             {
@@ -308,7 +562,35 @@ namespace kicq4WP
             }
         }
 
+        private void UpdateOwnStatusIcon(uint statusCode)
+        {
+            string icon;
+            switch (statusCode & 0xFFFF)
+            {
+                case 0x0001: icon = "away"; break;
+                case 0x0002: icon = "dnd"; break;
+                case 0x0004: icon = "na"; break;
+                case 0x0010: icon = "busy"; break;
+                case 0x0020: icon = "f4c"; break;
+                case 0x0100: icon = "inv"; break;
+                case 0x3000: icon = "evil"; break;
+                case 0x4000: icon = "depressed"; break;
+                case 0x5000: icon = "home"; break;
+                case 0x6000: icon = "work"; break;
+                case 0x2001: icon = "eating"; break;
+                default: icon = "online"; break;
+            }
 
+            try
+            {
+                OwnStatusIcon.Source = new Windows.UI.Xaml.Media.Imaging.BitmapImage(
+                    new Uri("ms-appx:///Assets/statuses/" + icon + ".png"));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[UpdateOwnStatusIcon ERROR] " + ex.Message);
+            }
+        }
 
         private string GetStatusIcon(Contact contact)
         {
@@ -547,34 +829,11 @@ namespace kicq4WP
             Frame.Navigate(typeof(SettingsPage));
         }
 
-        // ── OnNavigatedTo — добавь вызов ApplySettings после LoadContacts ───
-        // В конце блока if (!_initialized):
-        // ApplySettings();
 
         // ── При возврате со SettingsPage ─────────────────────────────────────
 
 
-        private async void StatusComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            var comboBox = sender as ComboBox;
-            if (comboBox != null && comboBox.SelectedItem != null)
-            {
-                string status = comboBox.SelectedItem.ToString();
-                if (!string.IsNullOrEmpty(status))
-                {
-                    try
-                    {
-                        // Временная реализация без реального изменения статуса
-                        // StatusTextBlock.Text = $"Статус: {status}";
-                    }
-                    catch (Exception ex)
-                    {
-                        var dialog = new MessageDialog($"Ошибка изменения статуса: {ex.Message}");
-                        await dialog.ShowAsync();
-                    }
-                }
-            }
-        }
+
         private async Task ShowErrorDialog(string message)
         {
             var dialog = new MessageDialog(message);
@@ -583,7 +842,7 @@ namespace kicq4WP
 
         private async void AcInfButton_Click(object sender, RoutedEventArgs e)
         {
-            await ShowErrorDialog("В разработке");
+            Frame.Navigate(typeof(AccountInfoPage));
         }
 
 

@@ -1,0 +1,188 @@
+﻿<Page
+    x:Class="kicq4WP.AccountInfoPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="#FF0D1117">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Шапка -->
+        <Border Grid.Row="0" Background="{StaticResource PhoneAccentBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="56"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Click="BackButton_Click"
+                        Background="Transparent" BorderThickness="0"
+                        Width="212" Height="56" Padding="0" Grid.ColumnSpan="2" Margin="-103,-1,0,-1">
+                    <TextBlock Text="         " FontFamily="Segoe UI Symbol"
+                               FontSize="22" Foreground="White"
+                               VerticalAlignment="Center" HorizontalAlignment="Center" Width="79"/>
+                </Button>
+                <TextBlock Grid.Column="1" Text="Мой профиль"
+                           FontSize="20" FontFamily="Segoe WP"
+                           FontWeight="SemiBold" Foreground="White"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="2" x:Name="SaveButton"
+                        Click="SaveButton_Click"
+                        Background="Transparent" BorderThickness="0"
+                        Padding="12,0,12,0" Height="56">
+                    <TextBlock Text="Сохранить" FontSize="16"
+                               FontFamily="Segoe WP" Foreground="White"/>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- Форма -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0">
+
+                <!-- UIN (только чтение) -->
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10" Margin="0,0,0,1">
+                    <TextBlock Text="ОСНОВНАЯ ИНФОРМАЦИЯ"
+                               FontSize="13" FontFamily="Segoe WP"
+                               FontWeight="SemiBold" Foreground="White"
+                               CharacterSpacing="150"/>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="UIN" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBlock x:Name="UinText" Text=""
+                                   FontSize="18" FontFamily="Segoe WP"
+                                   Foreground="White"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Ник -->
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Ник" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="NickBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Имя -->
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Имя" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="FirstNameBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Фамилия -->
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Фамилия" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="LastNameBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Email -->
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Email" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="EmailBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 InputScope="EmailSmtpAddress"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Телефон -->
+                <Border Background="#FF0078D7" Padding="16,10,16,10" Margin="0,16,0,1">
+                    <TextBlock Text="КОНТАКТЫ"
+                               FontSize="13" FontFamily="Segoe WP"
+                               FontWeight="SemiBold" Foreground="White"
+                               CharacterSpacing="150"/>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Телефон" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="PhoneBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 InputScope="TelephoneNumber"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Мобильный" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="CellBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 InputScope="TelephoneNumber"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Адрес -->
+                <Border Background="#FF0078D7" Padding="16,10,16,10" Margin="0,16,0,1">
+                    <TextBlock Text="АДРЕС"
+                               FontSize="13" FontFamily="Segoe WP"
+                               FontWeight="SemiBold" Foreground="White"
+                               CharacterSpacing="150"/>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Город" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="CityBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#FF161B22" Padding="16,12,16,12" Margin="0,0,0,1">
+                    <StackPanel>
+                        <TextBlock Text="Адрес" FontSize="13" FontFamily="Segoe WP"
+                                   Foreground="#66FFFFFF" Margin="0,0,0,4"/>
+                        <TextBox x:Name="AddressBox" Background="White" Foreground="Black"
+                                 FontSize="17" FontFamily="Segoe WP"
+                                 BorderThickness="0" Padding="8,6,8,6"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Height="20"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Прогресс -->
+        <Border Grid.Row="2" Background="#FF161B22" Padding="12,8,12,8"
+                x:Name="StatusBar">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <ProgressRing x:Name="LoadingRing" IsActive="False"
+                              Width="24" Height="24" Foreground="{StaticResource PhoneAccentBrush}"
+                              Margin="0,0,10,0"/>
+                <TextBlock x:Name="StatusText" Text=""
+                           FontSize="14" FontFamily="Segoe WP"
+                           Foreground="#88FFFFFF" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>

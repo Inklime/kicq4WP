@@ -9,6 +9,7 @@ namespace kicq4WP
     {
         private static CoreDispatcher _dispatcher;
         private static MediaElement _player;
+        private static Windows.Storage.Streams.IRandomAccessStream _currentStream;
 
         public static void Init(CoreDispatcher dispatcher)
         {
@@ -43,18 +44,26 @@ namespace kicq4WP
             {
                 if (_dispatcher == null || _player == null)
                 {
-                    Debug.WriteLine("[Sound] Not ready: dispatcher=" +
-                        (_dispatcher != null) + " player=" + (_player != null));
+                    Debug.WriteLine("[Sound] Not ready");
                     return;
                 }
 
                 var file = await Windows.Storage.StorageFile
                     .GetFileFromApplicationUriAsync(new Uri(uri));
-                var stream = await file.OpenAsync(
+
+                // Закрываем предыдущий stream
+                if (_currentStream != null)
+                {
+                    _currentStream.Dispose();
+                    _currentStream = null;
+                }
+
+                _currentStream = await file.OpenAsync(
                     Windows.Storage.FileAccessMode.Read);
                 string contentType = file.ContentType;
+                var stream = _currentStream;
 
-                await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+                await _dispatcher.RunAsync(CoreDispatcherPriority.High, () =>
                 {
                     try
                     {
@@ -74,6 +83,7 @@ namespace kicq4WP
                 Debug.WriteLine("[Sound] Error: " + ex.Message);
             }
         }
+
     }
 
 }

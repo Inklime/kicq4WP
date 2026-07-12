@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 public class ContactInfo
 {
@@ -12,6 +13,30 @@ public class ContactInfo
     public uint DcInternalIp { get; set; }
     public ushort DcPort { get; set; }
     public byte DcType { get; set; }
+    public string StatusMessage { get; set; }
+
+    public string Mood { get; set; }
+
+    public string MoodText
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Mood)) return "";
+            var map = new Dictionary<string, string>
+        {
+            {"icqmood0","Шоппинг"},{"icqmood1","В душе"},{"icqmood2","Хочу спать"},
+            {"icqmood3","Вечеринка"},{"icqmood4","Пиво"},{"icqmood5","Думаю"},
+            {"icqmood6","Ем"},{"icqmood7","ТВ"},{"icqmood8","Встреча"},
+            {"icqmood9","Кофе"},{"icqmood10","Музыка"},{"icqmood11","На работе"},
+            {"icqmood12","Кино"},{"icqmood13","Улыбаюсь"},{"icqmood14","Телефон"},
+            {"icqmood15","Компьютер"},{"icqmood16","Учусь"},{"icqmood17","Болею"},
+            {"icqmood18","Сплю"},{"icqmood19","Сёрфинг"},{"icqmood20","Интернет"},
+            {"icqmood21","Работаю"},{"icqmood22","Печатаю"},{"icqmood23","Злой"}
+        };
+            string text;
+            return map.TryGetValue(Mood, out text) ? text : Mood;
+        }
+    }
 
     // Отформатированные строки для UI
     public string StatusText

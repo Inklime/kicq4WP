@@ -24,10 +24,21 @@ namespace kicq4WP
         private bool _emojiVisible = false;
         private ObservableCollection<ChatMessage> _messages = new ObservableCollection<ChatMessage>();
         private ReconnectService _reconnect;
+        private DispatcherTimer _typingTimer;
+        private bool _isTyping = false;
+        private bool _typingNotificationsEnabled = true;
 
 
         // Сообщение, на которое сейчас отвечаем (или null)
         private ChatMessage _replyTo;
+        private HashSet<string> _loadedMessageKeys = new HashSet<string>();
+
+        private string MakeMessageKey(ChatMessage msg)
+        {
+            string textPart = msg.Text != null && msg.Text.Length > 50
+                ? msg.Text.Substring(0, 50) : msg.Text ?? "";
+            return (msg.IsOutgoing ? "O" : "I") + "|" + msg.Time + "|" + textPart;
+        }
 
         public ChatPage()
         {
@@ -42,6 +53,9 @@ namespace kicq4WP
             base.OnNavigatedTo(e);
 
             string forwardText = null;
+            SoundPlayer.AudioCategory = Windows.UI.Xaml.Media.AudioCategory.GameEffects;
+            SoundPlayer.AudioDeviceType = Windows.UI.Xaml.Media.AudioDeviceType.Multimedia;
+            SoundService.SetPlayer(SoundPlayer, Dispatcher);
 
             // Вариант навигации: (Contact, OscarProtocol, textToForward) — пришли из пересылки
             var paramWithForward = e.Parameter as Tuple<Contact, OscarProtocol, string>;
@@ -60,8 +74,18 @@ namespace kicq4WP
                 _oscar = param.Item2;
             }
 
+            _oscar.TypingNotificationReceived += OnTypingNotification;
+            _typingTimer = new DispatcherTimer();
+            _typingTimer.Interval = TimeSpan.FromSeconds(5);
+            _typingTimer.Tick += OnTypingTimerTick;
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            object typingEnabled = settings.Values["TypingNotifications"];
+            _typingNotificationsEnabled = typingEnabled == null || (bool)typingEnabled;
             ContactNameTextBlock.Text = _contact.Name;
             ContactUinTextBlock.Text = _contact.Uin;
+
+            // Обновляем AppBar в зависимости от типа контакта
+            UpdateAppBar();
 
             _reconnect = ((App)Application.Current).ReconnectService;
             if (_reconnect != null)
@@ -113,6 +137,72 @@ namespace kicq4WP
             }
         }
 
+        private void UpdateAppBar()
+        {
+            var bar = BottomAppBar as CommandBar;
+            if (bar == null) return;
+
+            // Очищаем все вторичные команды
+            bar.SecondaryCommands.Clear();
+
+            if (_contact.IsTemporary)
+            {
+                // Только добавление и очистка чата
+                var addBtn = new AppBarButton { Label = "Добавить в контакты", Icon = new SymbolIcon(Symbol.Add) };
+                addBtn.Click += AddToContacts_Click;
+                bar.SecondaryCommands.Add(addBtn);
+
+                var copyBtn = new AppBarButton { Label = "Скопировать UIN", Icon = new SymbolIcon(Symbol.Copy) };
+                copyBtn.Click += CopyUin_Click;
+                bar.SecondaryCommands.Add(copyBtn);
+
+                var clearBtn = new AppBarButton { Label = "Очистить чат", Icon = new SymbolIcon(Symbol.Clear) };
+                clearBtn.Click += ClearChat_Click;
+                bar.SecondaryCommands.Add(clearBtn);
+            }
+            else
+            {
+                // Полный набор для обычного контакта
+                var copyBtn = new AppBarButton { Label = "Скопировать UIN", Icon = new SymbolIcon(Symbol.Copy) };
+                copyBtn.Click += CopyUin_Click;
+                bar.SecondaryCommands.Add(copyBtn);
+
+                var infoBtn = new AppBarButton { Label = "Информация", Icon = new SymbolIcon(Symbol.People) };
+                infoBtn.Click += ContactInfo_Click;
+                bar.SecondaryCommands.Add(infoBtn);
+
+                var renameBtn = new AppBarButton { Label = "Переименовать", Icon = new SymbolIcon(Symbol.Edit) };
+                renameBtn.Click += RenameContact_Click;
+                bar.SecondaryCommands.Add(renameBtn);
+
+                var deleteBtn = new AppBarButton { Label = "Удалить контакт", Icon = new SymbolIcon(Symbol.Delete) };
+                deleteBtn.Click += DeleteContact_Click;
+                bar.SecondaryCommands.Add(deleteBtn);
+
+                var clearBtn = new AppBarButton { Label = "Очистить чат", Icon = new SymbolIcon(Symbol.Clear) };
+                clearBtn.Click += ClearChat_Click;
+                bar.SecondaryCommands.Add(clearBtn);
+            }
+        }
+
+        private async void AddToContacts_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                await _oscar.AddContactAsync(_contact.Uin, _contact.Name);
+                _contact.IsTemporary = false;
+                UpdateAppBar();
+                await new Windows.UI.Popups.MessageDialog(
+                    _contact.Name + " добавлен в контакты").ShowAsync();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[AddContact ERROR] " + ex.Message);
+                await new Windows.UI.Popups.MessageDialog(
+                    "Ошибка: " + ex.Message).ShowAsync();
+            }
+        }
+
         private void HardwareButtons_BackPressed(object sender, BackPressedEventArgs e)
         {
             if (Frame.CanGoBack)
@@ -122,19 +212,15 @@ namespace kicq4WP
             }
         }
 
-        private void OnEmojiPicked(object sender, RoutedEventArgs e)
+        private void OnEmojiPicked_GridView(object sender, ItemClickEventArgs e)
         {
-            var button = sender as Button;
-            if (button != null && button.Tag != null)
-            {
-                string emojiCode = button.Tag.ToString();
+            var item = e.ClickedItem as EmojiItem;
+            if (item == null) return;
 
-                int cursorPosition = MessageTextBox.SelectionStart;
-                MessageTextBox.Text = MessageTextBox.Text.Insert(cursorPosition, emojiCode);
-
-                MessageTextBox.SelectionStart = cursorPosition + emojiCode.Length;
-                MessageTextBox.Focus(FocusState.Programmatic);
-            }
+            int cursorPosition = MessageTextBox.SelectionStart;
+            MessageTextBox.Text = MessageTextBox.Text.Insert(cursorPosition, item.Code);
+            MessageTextBox.SelectionStart = cursorPosition + item.Code.Length;
+            MessageTextBox.Focus(FocusState.Programmatic);
         }
 
         private void EmojiButton_Click(object sender, RoutedEventArgs e)
@@ -142,11 +228,32 @@ namespace kicq4WP
             if (EmojiPanel.Visibility == Visibility.Visible)
             {
                 EmojiPanel.Visibility = Visibility.Collapsed;
+                return;
             }
-            else
+
+            EmojiPanel.Visibility = Visibility.Visible;
+
+            // Загружаем анимации лениво после отображения панели
+            if (!_emojiLoaded)
+                LoadEmojiAnimationsAsync();
+        }
+
+        private bool _emojiLoaded = false;
+
+        private async void LoadEmojiAnimationsAsync()
+        {
+            // Ждём пока GridView отрисуется
+            await Task.Delay(100);
+
+            int idx = 0;
+            foreach (var item in _availableEmojis)
             {
-                EmojiPanel.Visibility = Visibility.Visible;
+                item.ImagePath = item.ImagePath; // триггерим PropertyChanged
+                idx++;
+                if (idx % 5 == 0)
+                    await Task.Delay(16); // пауза каждые 5 смайликов
             }
+            _emojiLoaded = true;
         }
 
 
@@ -155,6 +262,10 @@ namespace kicq4WP
             base.OnNavigatedFrom(e);
             HardwareButtons.BackPressed -= HardwareButtons_BackPressed;
             NotificationService.Instance.ActiveChatUin = null;
+            _oscar.TypingNotificationReceived -= OnTypingNotification;
+            _oscar.SendTypingNotificationAsync(_contact.Uin, 0x0000);
+            SoundService.SetPlayer(null, null);
+            if (_typingTimer != null) _typingTimer.Stop();
             if (_reconnect != null)
             {
                 _reconnect.OnDisconnected -= OnConnectionLost;
@@ -163,6 +274,67 @@ namespace kicq4WP
             if (_oscar != null)
                 _oscar.IncomingMessage -= OnIncomingMessage;
         }
+
+        private async void OnTypingNotification(string senderUin, ushort type)
+        {
+            if (senderUin != _contact.Uin) return;
+
+            await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            {
+                switch (type)
+                {
+                    case 0x0002: // начал печатать
+                    case 0x0001: // набирает текст
+                        ContactUinTextBlock.Text = "печатает...";
+                        break;
+                    case 0x0000: // перестал
+                        ContactUinTextBlock.Text = _contact.Uin;
+                        break;
+                }
+            });
+        }
+
+        // Отправка при вводе
+        private async void MessageTextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (!_typingNotificationsEnabled) return;
+            string text = MessageTextBox.Text;
+
+            if (!string.IsNullOrEmpty(text))
+            {
+                if (!_isTyping)
+                {
+                    _isTyping = true;
+                    await _oscar.SendTypingNotificationAsync(_contact.Uin, 0x0002); // начал
+                }
+
+                // Сбрасываем таймер
+                _typingTimer.Stop();
+                _typingTimer.Start();
+            }
+            else
+            {
+                // Текст удалён
+                if (_isTyping)
+                {
+                    _isTyping = false;
+                    _typingTimer.Stop();
+                    await _oscar.SendTypingNotificationAsync(_contact.Uin, 0x0000); // остановился
+                }
+            }
+        }
+
+        // Таймер — если 5 секунд не печатал:
+        private async void OnTypingTimerTick(object sender, object e)
+        {
+            _typingTimer.Stop();
+            if (_isTyping)
+            {
+                _isTyping = false;
+                await _oscar.SendTypingNotificationAsync(_contact.Uin, 0x0001); // текст набран
+            }
+        }
+
 
         private async void OnIncomingMessage(string senderUin, string text)
         {
@@ -241,6 +413,9 @@ namespace kicq4WP
 
         private async Task SendCurrentMessage()
         {
+            _isTyping = false;
+            _typingTimer.Stop();
+            await _oscar.SendTypingNotificationAsync(_contact.Uin, 0x0000);
             string text = MessageTextBox.Text;
             if (text != null) text = text.Trim();
             if (string.IsNullOrEmpty(text) || _oscar == null) return;
@@ -253,24 +428,37 @@ namespace kicq4WP
                 finalText = quotedLines + "\n\n" + text;
             }
 
+            // Проверяем finalText тоже
+            if (string.IsNullOrEmpty(finalText)) return;
+
             MessageTextBox.Text = "";
             _replyTo = null;
-            ReplyPreviewPanel.Visibility = Visibility.Collapsed;
+            if (ReplyPreviewPanel != null)
+                ReplyPreviewPanel.Visibility = Visibility.Collapsed;
 
             try
             {
-                await _oscar.SendIcbmAsync(_contact.Uin, finalText);
+                // Отправляем в Task.Run чтобы не блокировать UI
+                await Task.Run(async () => await _oscar.SendIcbmAsync(_contact.Uin, finalText));
 
-                var msg = new ChatMessage();
-                msg.Text = finalText;
-                msg.SenderName = "Вы";
-                msg.Time = DateTime.Now.ToString("HH:mm");
-                msg.IsIncoming = false;
-                msg.IsOutgoing = true;
+                await Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+                {
+                    var msg = new ChatMessage();
+                    msg.Text = finalText;
+                    msg.SenderName = "Вы";
+                    msg.Time = DateTime.Now.ToString("HH:mm");
+                    msg.IsIncoming = false;
+                    msg.IsOutgoing = true;
 
-                _messages.Add(msg);
-                await SaveMessageAsync(msg);
-                ScrollToBottom();
+                    string key = MakeMessageKey(msg);
+                    if (!_loadedMessageKeys.Contains(key))
+                    {
+                        _loadedMessageKeys.Add(key);
+                        _messages.Add(msg);
+                        await SaveMessageAsync(msg);
+                        ScrollToBottom();
+                    }
+                });
             }
             catch (Exception ex)
             {
@@ -475,8 +663,13 @@ namespace kicq4WP
             sb.AppendLine("Группа: " + (_contact.Group ?? "—"));
             sb.AppendLine("Статус: " + statusText);
 
+
             if (info != null && !_contact.StatusIcon.Contains("offline"))
             {
+                if (!string.IsNullOrEmpty(info.StatusMessage))
+                    sb.AppendLine("Доп. статус: " + info.StatusMessage);
+                if (!string.IsNullOrEmpty(info.Mood))
+                    sb.AppendLine("Настроение: " + info.MoodText);
                 if (info.OnlineTime > 0)
                     sb.AppendLine("Онлайн: " + info.OnlineTimeText);
                 if (info.SignonTime > 0)
@@ -485,11 +678,48 @@ namespace kicq4WP
                     sb.AppendLine("Регистрация: " + info.MemberSinceText);
                 if (info.ExternalIp > 0)
                     sb.AppendLine("IP: " + info.ExternalIpText);
+
+            }
+
+            // Запрашиваем полную анкету — SNAC(15,02)/07D0/04D0, ответ
+            // SNAC(15,03)/07DA/00C8 (имя, фамилия, ник, email, город и т.д.)
+            ushort seq = (ushort)new Random().Next(1, 60000);
+            OscarProtocol.UserFullInfo fullInfo = null;
+            try
+            {
+                fullInfo = await _oscar.RequestFullUserInfoDetailedAsync(_contact.Uin, seq);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ContactInfo] RequestFullUserInfo error: " + ex.Message);
+            }
+
+            if (fullInfo != null)
+            {
+                sb.AppendLine();
+                sb.AppendLine("— Анкета —");
+                if (!string.IsNullOrEmpty(fullInfo.FirstName)) sb.AppendLine("Имя: " + fullInfo.FirstName);
+                if (!string.IsNullOrEmpty(fullInfo.LastName)) sb.AppendLine("Фамилия: " + fullInfo.LastName);
+                if (!string.IsNullOrEmpty(fullInfo.Nickname)) sb.AppendLine("Ник: " + fullInfo.Nickname);
+                if (!string.IsNullOrEmpty(fullInfo.Email)) sb.AppendLine("Email: " + fullInfo.Email);
+                if (!string.IsNullOrEmpty(fullInfo.HomeCity)) sb.AppendLine("Город: " + fullInfo.HomeCity);
+                if (!string.IsNullOrEmpty(fullInfo.HomeState)) sb.AppendLine("Регион: " + fullInfo.HomeState);
+                if (!string.IsNullOrEmpty(fullInfo.HomePhone)) sb.AppendLine("Телефон: " + fullInfo.HomePhone);
+                if (!string.IsNullOrEmpty(fullInfo.CellPhone)) sb.AppendLine("Мобильный: " + fullInfo.CellPhone);
+                if (!string.IsNullOrEmpty(fullInfo.HomeAddress)) sb.AppendLine("Адрес: " + fullInfo.HomeAddress);
+            }
+            else
+            {
+                sb.AppendLine();
+                sb.AppendLine("(Анкета недоступна или сервер не ответил)");
             }
 
             await new Windows.UI.Popups.MessageDialog(
                 sb.ToString(), _contact.Name).ShowAsync();
         }
+
+    
+
 
         private async void RenameContact_Click(object sender, RoutedEventArgs e)
         {

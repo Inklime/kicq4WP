@@ -8,21 +8,57 @@ using Windows.UI.Xaml.Media;
 using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Navigation;
 using Windows.Phone.UI.Input;
+using Windows.ApplicationModel.Activation;
+
 
 namespace kicq4WP
 {
     public sealed partial class SettingsPage : Page
     {
-        public SettingsPage()
+        private void PickBackground_Click(object sender, RoutedEventArgs e)
+        {
+            var picker = new Windows.Storage.Pickers.FileOpenPicker();
+            picker.ViewMode = Windows.Storage.Pickers.PickerViewMode.Thumbnail;
+            picker.SuggestedStartLocation =
+                Windows.Storage.Pickers.PickerLocationId.PicturesLibrary;
+            picker.FileTypeFilter.Add(".jpg");
+            picker.FileTypeFilter.Add(".jpeg");
+            picker.FileTypeFilter.Add(".png");
+            Windows.Storage.ApplicationData.Current.LocalSettings
+                .Values["PickerTarget"] = "background";
+            picker.PickSingleFileAndContinue();
+        }
+
+        private void PickChatBackground_Click(object sender, RoutedEventArgs e)
+        {
+            var picker = new Windows.Storage.Pickers.FileOpenPicker();
+            picker.ViewMode = Windows.Storage.Pickers.PickerViewMode.Thumbnail;
+            picker.SuggestedStartLocation =
+                Windows.Storage.Pickers.PickerLocationId.PicturesLibrary;
+            picker.FileTypeFilter.Add(".jpg");
+            picker.FileTypeFilter.Add(".jpeg");
+            picker.FileTypeFilter.Add(".png");
+            Windows.Storage.ApplicationData.Current.LocalSettings
+                .Values["PickerTarget"] = "chat_background";
+            picker.PickSingleFileAndContinue();
+        }
+    public SettingsPage()
         {
             this.InitializeComponent();
             HardwareButtons.BackPressed += HardwareButtons_BackPressed;
         }
 
+
+
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
             LoadSettings();
+
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            string bgPath = settings.Values["BackgroundPath"] as string;
+            if (!string.IsNullOrEmpty(bgPath))
+                UpdatePreview(bgPath);
         }
 
         protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -41,6 +77,10 @@ namespace kicq4WP
 
             object hideOffline = settings.Values["HideOffline"];
             HideOfflineToggle.IsOn = hideOffline != null && (bool)hideOffline;
+
+            object typingEnabled = settings.Values["TypingNotifications"];
+            // По умолчанию включено
+            TypingNotificationsToggle.IsOn = typingEnabled == null || (bool)typingEnabled;
 
             // Загружаем прозрачность
             object opacity = settings.Values["BackgroundOpacity"];
@@ -112,33 +152,7 @@ namespace kicq4WP
             settings.Values["ContactOpacity"] = (double)val;
         }
 
-        private async void PickChatBackground_Click(object sender, RoutedEventArgs e)
-        {
-            var picker = new FileOpenPicker();
-            picker.ViewMode = PickerViewMode.Thumbnail;
-            picker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-            picker.FileTypeFilter.Add(".jpg");
-            picker.FileTypeFilter.Add(".jpeg");
-            picker.FileTypeFilter.Add(".png");
 
-            StorageFile file = await picker.PickSingleFileAsync();
-            if (file == null) return;
-
-            try
-            {
-                StorageFolder localFolder = ApplicationData.Current.LocalFolder;
-                await file.CopyAsync(localFolder, "chat_background.jpg",
-                                     NameCollisionOption.ReplaceExisting);
-                var settings = ApplicationData.Current.LocalSettings;
-                settings.Values["ChatBackgroundPath"] =
-                    System.IO.Path.Combine(localFolder.Path, "chat_background.jpg");
-                Debug.WriteLine("[Settings] Chat background set");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[Settings] PickChatBackground error: " + ex.Message);
-            }
-        }
 
         private async void ClearChatBackground_Click(object sender, RoutedEventArgs e)
         {
@@ -153,6 +167,14 @@ namespace kicq4WP
             catch { }
         }
 
+        private void TypingNotificationsToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var settings = ApplicationData.Current.LocalSettings;
+            settings.Values["TypingNotifications"] = TypingNotificationsToggle.IsOn;
+            Debug.WriteLine("[Settings] TypingNotifications=" + TypingNotificationsToggle.IsOn);
+        }
+
+
         // ── Показ групп ─────────────────────────────────────────────
         private void ShowGroupsToggle_Toggled(object sender, RoutedEventArgs e)
         {
@@ -161,38 +183,7 @@ namespace kicq4WP
             Debug.WriteLine("[Settings] ShowGroups=" + ShowGroupsToggle.IsOn);
         }
 
-        // ── Выбор фона ──────────────────────────────────────────────
-        private async void PickBackground_Click(object sender, RoutedEventArgs e)
-        {
-            var picker = new FileOpenPicker();
-            picker.ViewMode = PickerViewMode.Thumbnail;
-            picker.SuggestedStartLocation = PickerLocationId.PicturesLibrary;
-            picker.FileTypeFilter.Add(".jpg");
-            picker.FileTypeFilter.Add(".jpeg");
-            picker.FileTypeFilter.Add(".png");
 
-            StorageFile file = await picker.PickSingleFileAsync();
-            if (file == null) return;
-
-            try
-            {
-                // Копируем в локальную папку приложения
-                StorageFolder localFolder = ApplicationData.Current.LocalFolder;
-                StorageFile copy = await file.CopyAsync(
-                    localFolder, "background.jpg",
-                    NameCollisionOption.ReplaceExisting);
-
-                var settings = ApplicationData.Current.LocalSettings;
-                settings.Values["BackgroundPath"] = copy.Path;
-
-                UpdatePreview(copy.Path);
-                Debug.WriteLine("[Settings] Background set: " + copy.Path);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("[Settings] PickBackground error: " + ex.Message);
-            }
-        }
 
         // ── Очистка фона ────────────────────────────────────────────
         private async void ClearBackground_Click(object sender, RoutedEventArgs e)

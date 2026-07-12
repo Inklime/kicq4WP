@@ -14,6 +14,8 @@ public class Contact : INotifyPropertyChanged
 
     [DataMember]
     public string Group { get; set; }
+    [DataMember]
+    public bool IsTemporary { get; set; }
 
     [DataMember]
     public string XtrazIcon { get; set; }

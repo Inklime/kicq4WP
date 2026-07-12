@@ -91,6 +91,9 @@ namespace kicq4WP
                 SettingsManager.SaveSetting("Login", login);
                 SettingsManager.SaveSetting("Password", password);
 
+                Windows.Storage.ApplicationData.Current.LocalSettings
+    .Values["LastStatus"] = (long)statusCode;
+
                 Frame.Navigate(typeof(MainPage), _oscarProtocol);
             }
             catch (TimeoutException)
@@ -120,24 +123,25 @@ namespace kicq4WP
 
         private uint GetSelectedStatusCode()
         {
-            var selectedItem = StatusComboBox.SelectedItem as ComboBoxItem;
-            string statusText = selectedItem?.Content?.ToString() ?? "Онлайн";
+            var item = StatusComboBox.SelectedItem as ComboBoxItem;
+            if (item == null) return 0x10010000;
 
-            switch (statusText)
+            switch (item.Content.ToString())
             {
-                case "Готов поболтать": return 0x000020;
-                case "Отошел": return 0x000001;
-                case "Недоступен": return 0x000004;
-                case "Занят": return 0x000010;
-                case "Не беспокоить": return 0x000002;
-                case "Дома": return 0x000060;
-                case "Работа": return 0x000070;
-                case "Кушаю": return 0x000080;
-                case "Депрессия": return 0x000090;
-                case "Злой": return 0x0000A0;
-                case "Невидимый": return 0x000100;
-                case "Невидимый для всех": return 0x000100;
-                default: return 0x000000;
+                case "Онлайн": return 0x10010000;
+                case "Готов поболтать": return 0x10010020;
+                case "Отошел": return 0x10010001;
+                case "Недоступен": return 0x10010004;
+                case "Занят": return 0x10010010;
+                case "Не беспокоить": return 0x10010002;
+                case "Дома": return 0x10015000;
+                case "Работа": return 0x10016000;
+                case "Кушаю": return 0x10012001;
+                case "Депрессия": return 0x10014000;
+                case "Злой": return 0x10013000;
+                case "Невидимый": return 0x10010100;
+                case "Невидимый для всех": return 0x10010100;
+                default: return 0x10010000;
             }
         }
 
