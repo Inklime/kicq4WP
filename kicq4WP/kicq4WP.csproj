@@ -92,11 +92,13 @@
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Backgroundtask.cs" />
     <Compile Include="BoolToVisibilityConverter.cs" />
     <Compile Include="ByteToOpacityConverter.cs" />
     <Compile Include="Contactgroup.cs" />
     <Compile Include="ContactInfo.cs" />
     <Compile Include="ContactStorage.cs" />
+    <Compile Include="Controlchannelservice.cs" />
     <Compile Include="EmojiManager.cs" />
     <Compile Include="InfoPage.xaml.cs">
       <DependentUpon>InfoPage.xaml</DependentUpon>

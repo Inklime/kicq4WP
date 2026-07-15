@@ -37,6 +37,45 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="0">
 
+                <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10" Margin="0,0,0,1">
+                    <TextBlock Text="СОЕДИНЕНИЕ"
+                               FontSize="13" FontFamily="Segoe WP"
+                               FontWeight="SemiBold" Foreground="White"
+                               CharacterSpacing="150"/>
+                </Border>
+
+                <Border x:Name="BackgroundModeBorder" Background="#FF161B22" Padding="16,0,16,0" Margin="0,0,0,1">
+                    <Grid MinHeight="56">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Работа в фоне"
+                       FontSize="17" FontFamily="Segoe WP" Foreground="White"/>
+                            <TextBlock Text="Приложение работает всегда"
+                       FontSize="13" FontFamily="Segoe WP" Foreground="#66FFFFFF"/>
+                        </StackPanel>
+                        <ToggleSwitch x:Name="BackgroundModeToggle"
+                      Grid.Column="1"
+                      Toggled="BackgroundModeToggle_Toggled"
+                      VerticalAlignment="Center"
+                      Margin="0,8,0,8"/>
+                    </Grid>
+                </Border>
+                <Border x:Name="BackgroundModeUnavailable" Background="#FF161B22" Padding="16,0,16,0" Margin="0,0,0,1">
+                    <Grid MinHeight="56">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="Работа в фоне недоступна для WP 8.1"
+                       FontSize="17" Foreground="#66FFFFFF" FontFamily="Segoe WP"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- Секция: Список контактов -->
                 <Border Background="{StaticResource PhoneAccentBrush}" Padding="16,10,16,10" Margin="0,0,0,1">
                     <TextBlock Text="КОНТАКТЫ"
@@ -44,6 +83,7 @@
                                FontWeight="SemiBold" Foreground="White"
                                CharacterSpacing="150"/>
                 </Border>
+                
 
                 <!-- Показывать группы -->
                 <Border Background="#FF161B22" Padding="16,0,16,0" Margin="0,0,0,1">
@@ -297,7 +337,7 @@
                         <TextBlock Text="ICQ клиент для Windows Phone 8.1"
                                    FontSize="14" FontFamily="Segoe WP"
                                    Foreground="#88FFFFFF" Margin="0,4,0,0"/>
-                        <TextBlock Text="Версия: 1.3.1.1"
+                        <TextBlock Text="Версия: 1.4.1.1"
                                    FontSize="13" FontFamily="Segoe WP"
                                    Foreground="#66FFFFFF" Margin="0,2,0,0"/>
                     </StackPanel>

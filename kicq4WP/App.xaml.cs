@@ -75,19 +75,16 @@ namespace kicq4WP
 
         protected override void OnLaunched(LaunchActivatedEventArgs e)
         {
-            Frame rootFrame = Window.Current.Content as Frame;
+            var rootGrid = Window.Current.Content as Grid;
 
-            if (rootFrame == null)
+            if (rootGrid == null)
             {
-                rootFrame = new Frame();
-                rootFrame.NavigationFailed += OnNavigationFailed; // кстати, раньше это вообще нигде не подключалось
-
-                var rootGrid = new Grid();
+                rootGrid = new Grid();
+                var rootFrame = new Frame();
+                rootFrame.NavigationFailed += OnNavigationFailed;
                 rootGrid.Children.Add(rootFrame);
 
-                // Единственный MediaElement на всё приложение — живёт здесь,
-                // а не на конкретной странице, поэтому Frame.Navigate между
-                // MainPage/ChatPage/SettingsPage никогда его не выгружает.
+                // MediaElement живёт в корневом Grid — не выгружается при навигации
                 var soundPlayer = new MediaElement
                 {
                     AutoPlay = false,
@@ -96,14 +93,21 @@ namespace kicq4WP
                     Height = 0
                 };
                 rootGrid.Children.Add(soundPlayer);
-
                 Window.Current.Content = rootGrid;
 
+                // Инициализируем SoundService ОДИН РАЗ
                 SoundService.SetPlayer(soundPlayer, Window.Current.Dispatcher);
             }
 
-            if (rootFrame.Content == null)
-                rootFrame.Navigate(typeof(LoginPage), e.Arguments);
+            var frame = null as Frame;
+            foreach (var child in ((Grid)Window.Current.Content).Children)
+            {
+                frame = child as Frame;
+                if (frame != null) break;
+            }
+
+            if (frame != null && frame.Content == null)
+                frame.Navigate(typeof(LoginPage), e.Arguments);
 
             Window.Current.Activate();
         }

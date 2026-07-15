@@ -53,9 +53,6 @@ namespace kicq4WP
             base.OnNavigatedTo(e);
 
             string forwardText = null;
-            SoundPlayer.AudioCategory = Windows.UI.Xaml.Media.AudioCategory.GameEffects;
-            SoundPlayer.AudioDeviceType = Windows.UI.Xaml.Media.AudioDeviceType.Multimedia;
-            SoundService.SetPlayer(SoundPlayer, Dispatcher);
 
             // Вариант навигации: (Contact, OscarProtocol, textToForward) — пришли из пересылки
             var paramWithForward = e.Parameter as Tuple<Contact, OscarProtocol, string>;
@@ -264,7 +261,6 @@ namespace kicq4WP
             NotificationService.Instance.ActiveChatUin = null;
             _oscar.TypingNotificationReceived -= OnTypingNotification;
             _oscar.SendTypingNotificationAsync(_contact.Uin, 0x0000);
-            SoundService.SetPlayer(null, null);
             if (_typingTimer != null) _typingTimer.Stop();
             if (_reconnect != null)
             {

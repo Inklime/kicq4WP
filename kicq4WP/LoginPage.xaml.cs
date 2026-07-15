@@ -30,10 +30,6 @@ namespace kicq4WP
             PasswordBox.Password = savedPassword;
         }
 
-        private async void OnlOpenButton_Click(object sender, RoutedEventArgs e)
-        {
-            Frame.Navigate(typeof(MainPage));
-        }
 
 
 
@@ -67,7 +63,9 @@ namespace kicq4WP
                 bool success = await _oscarProtocol.AuthenticateAsync(statusCode);
                 if (!success)
                 {
-                    await ShowMessageDialog("Ошибка авторизации. Проверьте логин и пароль.");
+                    string lastError = _oscarProtocol.LastAuthError ??
+                                       "Не удалось подключиться к серверу. Проверьте интернет.";
+                    await ShowMessageDialog(lastError);
                     return;
                 }
 

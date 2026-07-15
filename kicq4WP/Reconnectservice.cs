@@ -22,6 +22,7 @@ namespace kicq4WP
         public event Action OnReconnecting;
         private volatile bool _kicked = false;
         public event Action<string> KickedOut;
+        private Windows.Networking.Connectivity.NetworkStatusChangedEventHandler _networkHandler;
 
         // Событие — подписываемся в App чтобы обновить UI после реконнекта
         public event Action<OscarProtocol> Reconnected;
@@ -38,22 +39,66 @@ namespace kicq4WP
         public void Start(OscarProtocol oscar)
         {
             _oscar = oscar;
-            _oscar.DisconnectedByServer += OnKickedByServer;
             _running = true;
             _cts = new CancellationTokenSource();
+
+            // Подписываемся на изменения сети
+            _networkHandler = new Windows.Networking.Connectivity.NetworkStatusChangedEventHandler(
+                OnNetworkStatusChanged);
+            Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged += _networkHandler;
+
             Task.Run(() => MonitorLoopAsync(_cts.Token));
         }
 
         public void Stop()
         {
-            Debug.WriteLine("[Reconnect] Stopping...");
             _running = false;
+            if (_networkHandler != null)
+            {
+                Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged -= _networkHandler;
+                _networkHandler = null;
+            }
             if (_cts != null)
             {
                 _cts.Cancel();
                 _cts = null;
             }
-            Debug.WriteLine("[Reconnect] Stopped.");
+        }
+
+        private async void OnNetworkStatusChanged(object sender)
+        {
+            var profile = Windows.Networking.Connectivity.NetworkInformation
+                .GetInternetConnectionProfile();
+
+            if (profile == null)
+            {
+                Debug.WriteLine("[Reconnect] Network lost");
+                return;
+            }
+
+            var level = profile.GetNetworkConnectivityLevel();
+            if (level == Windows.Networking.Connectivity.NetworkConnectivityLevel.InternetAccess)
+            {
+                Debug.WriteLine("[Reconnect] Network restored — forcing reconnect");
+
+                // Отменяем текущий цикл и запускаем реконнект
+                if (_cts != null)
+                {
+                    _cts.Cancel();
+                    _cts = new CancellationTokenSource();
+                }
+
+                if (_oscar != null)
+                {
+                    try { await _oscar.DisconnectAsync(); } catch { }
+                }
+
+                // Небольшая пауза чтобы сеть стабилизировалась
+                await Task.Delay(2000);
+
+                // Запускаем переподключение
+                Task.Run(() => MonitorLoopAsync(_cts.Token));
+            }
         }
 
         private void OnKickedByServer(string reason)

@@ -288,11 +288,5 @@
                 </ScrollViewer>
             </StackPanel>
         </Border>
-        <!-- В конце Grid, невидимый элемент -->
-        <MediaElement x:Name="SoundPlayer"
-              Grid.Row="0" Grid.RowSpan="2"
-              AutoPlay="False"
-              Opacity="0"
-              Width="1" Height="1"/>
     </Grid>
 </Page>

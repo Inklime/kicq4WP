@@ -41,6 +41,7 @@ namespace kicq4WP
         public event Action<Contact> TemporaryContactAdded;
         public event Action<string, ushort> TypingNotificationReceived; // uin, type
         public event Action<UserBasicInfo> OwnInfoReceived;
+        public string LastAuthError { get; private set; }
         public Action<string> StatusUpdater { get; set; }
         public event Action<string, string> IncomingMessage;
         private Dictionary<ushort, SsiGroup> _ssiGroups = new Dictionary<ushort, SsiGroup>();
@@ -109,6 +110,15 @@ namespace kicq4WP
         {
             _socket = new StreamSocket();
             var hostName = new HostName("195.66.114.37");
+
+            // Инициализируем CCT ДО подключения
+            var trigger = await ControlChannelService.Instance.InitializeAsync();
+            if (trigger != null)
+            {
+                bool assigned = ControlChannelService.Instance.AssignSocket(_socket);
+                Debug.WriteLine("[ConnectAsync] CCT assigned: " + assigned);
+            }
+
             await _socket.ConnectAsync(hostName, "5190");
 
             _writer = new DataWriter(_socket.OutputStream);
@@ -215,7 +225,31 @@ namespace kicq4WP
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[Auth ERROR] {ex.Message}");
+                Debug.WriteLine("[Auth ERROR] " + ex.Message);
+
+                // Определяем тип ошибки по HRESULT
+                if (ex.Message.Contains("0x8007274C") ||
+                    ex.Message.Contains("did not properly respond") ||
+                    ex.Message.Contains("host has failed to respond"))
+                {
+                    LastAuthError = "Сервер не отвечает. Проверьте подключение к интернету.";
+                }
+                else if (ex.Message.Contains("0x8007274D") ||
+                         ex.Message.Contains("connection was forcibly closed") ||
+                         ex.Message.Contains("No connection could be made"))
+                {
+                    LastAuthError = "Не удалось подключиться к серверу. Сервер может быть недоступен.";
+                }
+                else if (ex.Message.Contains("0x80072EFD") ||
+                         ex.Message.Contains("internet"))
+                {
+                    LastAuthError = "Нет подключения к интернету.";
+                }
+                else
+                {
+                    LastAuthError = "Ошибка подключения: " + ex.Message;
+                }
+
                 return false;
             }
         }
@@ -283,9 +317,26 @@ namespace kicq4WP
 
                 if (flap?.Channel == 0x04)
                 {
-                    Debug.WriteLine($"[DirectAuth] Got FLAP type 0x04, Length={flap.Data.Length}");
+                    Debug.WriteLine("[DirectAuth] Got FLAP 0x04, Length=" + flap.Data.Length);
+
+                    // Проверяем — это ошибка или BOS redirect
+                    string authError = ParseAuthError(flap.Data);
+                    if (authError != null)
+                    {
+                        LastAuthError = authError;
+                        Debug.WriteLine("[DirectAuth] Auth error: " + authError);
+                        return false; // возвращаем false вместо throw
+                    }
+
                     return await HandleBosRedirectAsync(flap.Data, 0x00000000);
                 }
+
+                if (flap == null)
+                    throw new Exception("Сервер не ответил. Проверьте подключение к интернету.");
+                    Debug.WriteLine("[DirectAuth] Server didn't respond. Is server online? Do you have internet connection?");
+
+                Debug.WriteLine("[DirectAuth] Unexpected FLAP channel=" + flap?.Channel);
+                throw new Exception("Неожиданный ответ от сервера.");
 
                 Debug.WriteLine("[DirectAuth] Unexpected FLAP or no response.");
                 return false;
@@ -297,7 +348,67 @@ namespace kicq4WP
             }
         }
 
+        private string ParseAuthError(byte[] data)
+        {
+            try
+            {
+                int offset = 0;
+                ushort errorCode = 0;
+                bool hasError = false;
 
+                while (offset + 4 <= data.Length)
+                {
+                    ushort tlvType = ReadU16(data, ref offset);
+                    ushort tlvLen = ReadU16(data, ref offset);
+                    if (offset + tlvLen > data.Length) break;
+
+                    if (tlvType == 0x0008 && tlvLen >= 2)
+                    {
+                        errorCode = ReadU16(data, ref offset);
+                        hasError = true;
+                    }
+                    else if (tlvType == 0x0005)
+                    {
+                        // Это BOS cookie — не ошибка
+                        return null;
+                    }
+                    else
+                    {
+                        offset += tlvLen;
+                    }
+                }
+
+                if (!hasError) return null;
+
+                switch (errorCode)
+                {
+                    case 0x0001: return "Неверный логин или пароль.";
+                    case 0x0002: return "Сервис временно недоступен. Попробуйте позже.";
+                    case 0x0003: return "Произошла ошибка. Попробуйте позже.";
+                    case 0x0004: return "Неверный логин или пароль. Попробуйте снова.";
+                    case 0x0005: return "Несовпадение логина или пароля. Попробуйте снова.";
+                    case 0x0006: return "Ошибка клиента при авторизации.";
+                    case 0x0007: return "Неверный аккаунт.";
+                    case 0x0008: return "Аккаунт удалён.";
+                    case 0x0009: return "Срок действия аккаунта истёк.";
+                    case 0x000A: return "Нет доступа к базе данных.";
+                    case 0x000B: return "Нет доступа к серверу.";
+                    case 0x000F: return "Внутренняя ошибка сервера.";
+                    case 0x0010: return "Сервис временно отключён. Попробуйте позже.";
+                    case 0x0011: return "Аккаунт приостановлен.";
+                    case 0x0016: return "Превышено количество подключений с этого IP.";
+                    case 0x0018: return "Превышен лимит запросов. Попробуйте через несколько минут.";
+                    case 0x001D: return "Превышен лимит запросов. Попробуйте через несколько минут.";
+                    case 0x001E: return "Не удаётся подключиться к сети. Попробуйте через несколько минут.";
+                    default: return "Ошибка авторизации (код 0x" + errorCode.ToString("X4") + ").";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine("[ParseAuthError] " + ex.Message);
+                return null;
+            }
+        }
 
 
         private async Task<bool> SendLoginWithChallenge(byte[] challenge) //(нерабочий) TODO: безопасный логин
@@ -673,6 +784,7 @@ namespace kicq4WP
 
                 flap.Data = new byte[flap.DataLength];
                 _reader.ReadBytes(flap.Data);
+                ControlChannelService.Instance.NotifyDataReceived();
 
                 return flap;
             }
@@ -1608,15 +1720,8 @@ namespace kicq4WP
                 _socket?.Dispose();
 
                 // Создаем новое соединение
-                _socket = new StreamSocket();
-                await _socket.ConnectAsync(new HostName(host), port);
-
-                _writer = new DataWriter(_socket.OutputStream);
-                _reader = new DataReader(_socket.InputStream)
-                {
-                    InputStreamOptions = InputStreamOptions.Partial,
-                    ByteOrder = ByteOrder.BigEndian
-                };
+                _socket?.Dispose();
+                await ConnectToBosSocketAsync(host, port);
 
                 // 1. Ждем приветствие от сервера (FLAP 0x01)
                 Debug.WriteLine("[BOS] Waiting for server hello (FLAP 0x01)...");
@@ -1695,6 +1800,38 @@ namespace kicq4WP
             }
         }
 
+        private async Task ConnectToBosSocketAsync(string host, string port)
+        {
+            _socket = new StreamSocket();
+
+            // Проверяем включена ли фоновая работа
+            object bgMode = Windows.Storage.ApplicationData.Current
+                .LocalSettings.Values["BackgroundMode"];
+            bool backgroundEnabled = bgMode == null || (bool)bgMode;
+
+            if (backgroundEnabled)
+            {
+                var trigger = await ControlChannelService.Instance.InitializeAsync();
+                if (trigger != null)
+                {
+                    bool assigned = ControlChannelService.Instance.AssignSocket(_socket);
+                    Debug.WriteLine("[ConnectToBos] CCT assigned: " + assigned);
+                }
+            }
+            else
+            {
+                Debug.WriteLine("[ConnectToBos] Background mode disabled, skipping CCT");
+            }
+
+            await _socket.ConnectAsync(new HostName(host), port);
+
+            _writer = new DataWriter(_socket.OutputStream);
+            _reader = new DataReader(_socket.InputStream)
+            {
+                InputStreamOptions = InputStreamOptions.Partial,
+                ByteOrder = ByteOrder.BigEndian
+            };
+        }
 
         private async Task<bool> HandleBosRedirectAsync(byte[] data, uint statusCode)
         {
@@ -2485,7 +2622,7 @@ namespace kicq4WP
             switch (subtype)
             {
                 case 0x00C8: // META_BASIC_USERINFO
-                    HandleMetaBasicUserInfo(data, offset, end);
+                    ParseFullUserInfoBasic(data, offset, end);
                     isLast = true;
                     break;
 
@@ -3623,6 +3760,8 @@ namespace kicq4WP
                 try { _socket?.Dispose(); } catch { }
                 _socket = null;
 
+                ControlChannelService.Instance.Cleanup();
+
                 Debug.WriteLine("[OscarProtocol] Disconnected.");
             }
             catch (Exception ex)
@@ -3919,13 +4058,21 @@ namespace kicq4WP
 
                     try
                     {
-                        // FLAP channel 0x05, пустые данные
-                        await SendFlapAsync(0x05, new byte[0]);
+                        // Отправляем keep alive с таймаутом
+                        var sendTask = SendFlapAsync(0x05, new byte[0]);
+                        if (await Task.WhenAny(sendTask, Task.Delay(30000, token)) != sendTask)
+                        {
+                            Debug.WriteLine("[KeepAlive] Timeout — connection dead");
+                            _receiveCts?.Cancel();
+                            break;
+                        }
+                        await sendTask; // проверяем исключение
                         Debug.WriteLine("[KeepAlive] Sent");
                     }
                     catch (Exception ex)
                     {
                         Debug.WriteLine("[KeepAlive] Failed: " + ex.Message);
+                        _receiveCts?.Cancel();
                         break;
                     }
                 }
@@ -3934,6 +4081,7 @@ namespace kicq4WP
             catch (Exception ex)
             {
                 Debug.WriteLine("[KeepAlive ERROR] " + ex.Message);
+                _receiveCts?.Cancel();
             }
         }
 

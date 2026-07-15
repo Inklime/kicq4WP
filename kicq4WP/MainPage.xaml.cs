@@ -90,9 +90,6 @@ namespace kicq4WP
             // 1. ПЕРВИЧНАЯ ИНИЦИАЛИЗАЦИЯ (выполняется только один раз)
             if (!_initialized)
             {
-                SoundPlayer.AudioCategory = Windows.UI.Xaml.Media.AudioCategory.GameEffects;
-                SoundPlayer.AudioDeviceType = Windows.UI.Xaml.Media.AudioDeviceType.Multimedia;
-                SoundService.SetPlayer(SoundPlayer, Dispatcher);
                 var oscarProtocol = e.Parameter as OscarProtocol;
                 if (oscarProtocol == null) return;
 

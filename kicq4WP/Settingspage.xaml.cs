@@ -9,6 +9,7 @@ using Windows.UI.Xaml.Media.Imaging;
 using Windows.UI.Xaml.Navigation;
 using Windows.Phone.UI.Input;
 using Windows.ApplicationModel.Activation;
+using Windows.System.Profile;
 
 
 namespace kicq4WP
@@ -82,6 +83,16 @@ namespace kicq4WP
             // По умолчанию включено
             TypingNotificationsToggle.IsOn = typingEnabled == null || (bool)typingEnabled;
 
+            var isW10 = IsW10M();
+
+            if (!isW10)
+                BackgroundModeBorder.Visibility = Visibility.Collapsed;
+                BackgroundModeUnavailable.Visibility = Visibility.Collapsed;
+
+            // работа в фоне
+            object bgMode = settings.Values["BackgroundMode"];
+            BackgroundModeToggle.IsOn = bgMode == null || (bool)bgMode;
+
             // Загружаем прозрачность
             object opacity = settings.Values["BackgroundOpacity"];
             double opacityVal = opacity != null ? (double)opacity : 100.0;
@@ -106,6 +117,20 @@ namespace kicq4WP
                 Frame.GoBack();
             }
         }
+
+        public static bool IsW10M()
+        {
+            try
+            {
+                var type = Type.GetType("Windows.System.Profile.AnalyticsInfo, Windows, ContentType=WindowsRuntime");
+                return type != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+        
 
         private async void UpdatePreview(string path)
         {
@@ -183,7 +208,16 @@ namespace kicq4WP
             Debug.WriteLine("[Settings] ShowGroups=" + ShowGroupsToggle.IsOn);
         }
 
+        private void BackgroundModeToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            var settings = Windows.Storage.ApplicationData.Current.LocalSettings;
+            settings.Values["BackgroundMode"] = BackgroundModeToggle.IsOn;
 
+            if (!BackgroundModeToggle.IsOn)
+                ControlChannelService.Instance.Cleanup();
+
+            Debug.WriteLine("[Settings] BackgroundMode=" + BackgroundModeToggle.IsOn);
+        }
 
         // ── Очистка фона ────────────────────────────────────────────
         private async void ClearBackground_Click(object sender, RoutedEventArgs e)

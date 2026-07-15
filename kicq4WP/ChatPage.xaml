@@ -238,10 +238,6 @@
                          TextChanged="MessageTextBox_TextChanged"
                          KeyDown="MessageTextBox_KeyDown"
                          Grid.ColumnSpan="2"/>
-                <MediaElement x:Name="SoundPlayer"
-              Grid.Row="0" Grid.RowSpan="4"
-              AutoPlay="False"
-              Width="0" Height="0"/>
             </Grid>
         </Border>
 
